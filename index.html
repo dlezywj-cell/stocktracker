@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (完美归一化)</title>
+    <title>行业强弱追踪 (完美交互版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -221,7 +221,6 @@
             z: 2 
         }));
 
-        // 如果没有传入范围，计算当前百分比
         let startPercent = 0;
         let endPercent = 100;
         if (startIdx !== null && endIdx !== null && globalAllDates.length > 0) {
@@ -232,17 +231,35 @@
         const option = {
             animation: false, 
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
+            
+            // --- 核心修改：Tooltip 逻辑优化 ---
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
+                // 确保浮层在最上层，防止被遮挡
+                z: 100,
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
+                    
+                    // 按数值降序排列，方便阅读
+                    params.sort((a,b) => b.value - a.value);
+
                     params.forEach(p => {
-                        if (lockedSeries && p.seriesName !== lockedSeries) return;
-                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};"></span>`;
+                        // 判断是否被“变暗”
+                        // 如果有 lockedSeries，且当前不是 lockedSeries，则判定为变暗
+                        const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
+                        
+                        // 样式控制
+                        const opacity = isDimmed ? '0.3' : '1';
+                        const fontWeight = isDimmed ? 'normal' : 'bold';
+                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${opacity}"></span>`;
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
-                        html += `${colorDot}<b>${p.seriesName}</b>: ${valStr}<br/>`;
+                        
+                        // 组合 HTML
+                        html += `<div style="opacity:${opacity}; font-weight:${fontWeight}">
+                                    ${colorDot}${p.seriesName}: ${valStr}
+                                 </div>`;
                     });
                     return html;
                 }
@@ -285,9 +302,7 @@
 
         myChart.setOption(option, true);
         
-        // 初始归一化
         if (startIdx === null) {
-            // 如果没传，就从当前的百分比反推
             const opt = myChart.getOption();
             const sPct = opt.dataZoom[0].start;
             startIdx = Math.floor(globalAllDates.length * sPct / 100);
@@ -296,16 +311,12 @@
         renderRankList(option.color);
     }
 
-    // 核心修复：更精确的索引获取
     function updateDynamicNormalization(viewStartIdx) {
         if (!currentRankedData.length) return;
         viewStartIdx = Math.max(0, Math.min(viewStartIdx, globalAllDates.length - 1));
 
         const newSeries = currentRankedData.map(item => {
-            // 务必取到当前视窗第一天的价格
             let basePrice = item.fullData[viewStartIdx];
-            
-            // 极其罕见的情况：那天停牌没有价格，往后找
             if (!basePrice) {
                 for(let i=viewStartIdx; i<item.fullData.length; i++) {
                     if(item.fullData[i]) { basePrice = item.fullData[i]; break; }
@@ -313,7 +324,6 @@
             }
             if (!basePrice) return item.fullData; 
 
-            // 重新计算
             return item.fullData.map(p => {
                 if(!p) return null;
                 return parseFloat((p / basePrice).toFixed(4));
@@ -326,24 +336,18 @@
     }
 
     function setupEvents() {
-        // 关键修复：直接监听百分比变化，而不依赖 axisProxy
         myChart.on('dataZoom', function(params) {
-            // 获取最新的 DataZoom 状态
             const opt = myChart.getOption();
             const startPct = opt.dataZoom[0].start;
             const endPct = opt.dataZoom[0].end;
             
-            // 将百分比转换为准确的索引
             const totalLen = globalAllDates.length;
             const sIdx = Math.floor(totalLen * startPct / 100);
             const eIdx = Math.ceil(totalLen * endPct / 100);
 
-            // 1. 立即执行归一化，让线条左侧对齐
             updateDynamicNormalization(sIdx);
 
-            // 2. 更新顶部日期输入框
             if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
-            // 取 eIdx-1 因为 slice 是不包含结尾的，但这里我们要显示最后一天
             const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
             if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
         });
