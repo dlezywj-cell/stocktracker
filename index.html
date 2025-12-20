@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (绝对对齐版)</title>
+    <title>行业强弱追踪 (复选过滤版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -78,8 +78,13 @@
         .list-item:hover { background: #f9f9f9; }
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
         .list-item.dimmed { opacity: 0.35; filter: grayscale(100%); } 
+        /* 隐藏状态：稍微变灰，但不完全消失，以便可以勾选回来 */
+        .list-item.unchecked { opacity: 0.5; background: #fcfcfc; }
+        .list-item.unchecked .idx-val { color: #ccc !important; }
 
-        .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .idx-left-group { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .idx-chk { cursor: pointer; width: 14px; height: 14px; flex-shrink: 0; }
+        .idx-name { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .idx-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; transition: background 0.3s;}
         .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
         .up { color: var(--danger); }
@@ -145,6 +150,8 @@
     let lockedSeries = null;
     let currentRankedData = []; 
     let globalAllDates = [];
+    // 新增：可见性状态管理 (key: industryName, value: boolean)
+    let visibilityState = {};
     
     // 颜色池
     const colorPalette = ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e'];
@@ -186,6 +193,9 @@
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
         lockedSeries = null;
+        // 重置可见性状态 (每次重新排名时，默认全选)
+        visibilityState = {};
+
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
         const nStart = parseInt(document.getElementById('rankStart').value);
@@ -212,9 +222,12 @@
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
         currentRankedData.forEach((item, index) => {
+            // 初始化颜色
             if (!industryColors[item.name]) {
                 industryColors[item.name] = colorPalette[index % colorPalette.length];
             }
+            // 初始化可见性 (默认全选)
+            visibilityState[item.name] = true;
         });
 
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
@@ -226,6 +239,7 @@
             setupEvents();
         }
 
+        // 初始化时，根据 visibilityState 决定是否显示数据
         const series = currentRankedData.map(item => ({
             name: item.name,
             type: 'line',
@@ -233,7 +247,8 @@
             showSymbol: false, 
             triggerLineEvent: true,
             lineStyle: { width: 2 },
-            data: item.fullData, 
+            // 如果未选中，初始数据为空，不显示
+            data: visibilityState[item.name] ? item.fullData : [], 
             emphasis: { disabled: true },
             z: 2,
             itemStyle: { color: industryColors[item.name] }
@@ -258,6 +273,9 @@
                     let html = params[0].axisValue + '<br/>';
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
+                        // 只显示数值有效的点 (未勾选的不会出现在这里，因为 data 是空的)
+                        if (p.value === undefined || p.value === null) return;
+
                         const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
@@ -318,15 +336,19 @@
         updateChartAndList(startIdx, endIdx);
     }
 
-    // 核心函数：归一化 + 列表重算 + 排序
+    // 核心函数：更新图表和列表
     function updateChartAndList(sIdx, eIdx) {
         sIdx = Math.max(0, Math.min(sIdx, globalAllDates.length - 1));
         eIdx = Math.min(eIdx, globalAllDates.length); 
         const actualEndIdx = Math.max(sIdx, eIdx - 1); 
 
         const newSeries = currentRankedData.map(item => {
+            // 如果未勾选，直接返回空数组，图表不渲染
+            if (!visibilityState[item.name]) {
+                return { data: [] };
+            }
+
             let basePrice = item.fullData[sIdx];
-            
             if (!basePrice || basePrice === 0) {
                 for(let i = sIdx; i < item.fullData.length; i++) {
                     if(item.fullData[i] && item.fullData[i] !== 0) { 
@@ -335,26 +357,23 @@
                     }
                 }
             }
-            
-            if (!basePrice) return item.fullData.map(() => null);
+            if (!basePrice) return { data: item.fullData.map(() => null) };
 
-            // --- 终极修复：数据屏蔽 (Masking) ---
-            // 强行把 startIdx 之前的数据设为 null，
-            // 这样线条就会在 startIdx 这个点“凭空出现”，位置正好是 0%
-            return item.fullData.map((p, i) => {
+            const processedData = item.fullData.map((p, i) => {
+                // 屏蔽起点之前的数据
                 if (i < sIdx || !p) return null;
                 return parseFloat((p / basePrice).toFixed(4));
             });
+            
+            return { data: processedData };
         });
         
-        // 更新图表
         myChart.setOption({ 
-            series: newSeries.map(data => ({ data: data })),
-            // 同时强制 dataZoom 锁定到这个整数索引，防止浮点数漂移
+            series: newSeries,
             dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
         });
 
-        // 列表排序逻辑
+        // 列表排序
         const sortedList = currentRankedData.map(item => {
             const startP = item.fullData[sIdx];
             const endP = item.fullData[actualEndIdx];
@@ -377,6 +396,7 @@
         }
     }
 
+    // 渲染列表 DOM (新增复选框)
     function renderRankList(sortedData) {
         const container = document.getElementById('rankList');
         let html = '';
@@ -391,7 +411,10 @@
             }
 
             let itemClass = 'list-item';
-            if (lockedSeries) {
+            // 如果被取消勾选，添加 unchecked 样式
+            if (!visibilityState[item.name]) {
+                itemClass += ' unchecked';
+            } else if (lockedSeries) {
                 if (lockedSeries === item.name) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -402,14 +425,41 @@
                  onmouseenter="applyHighlight('${item.name}')"
                  onmouseleave="clearHighlight()"
                  onclick="toggleLock('${item.name}')">
-                <div class="idx-name">
-                    <div class="idx-dot" style="background:${color}"></div>
-                    ${index + 1}. ${item.name}
+                
+                <div class="idx-left-group">
+                    <!-- 复选框：阻止冒泡，单独处理 -->
+                    <input type="checkbox" class="idx-chk" 
+                           ${visibilityState[item.name] ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleVisibility('${item.name}')">
+                    
+                    <div class="idx-name">
+                        <div class="idx-dot" style="background:${color}"></div>
+                        ${index + 1}. ${item.name}
+                    </div>
                 </div>
+                
                 <div class="idx-val ${cls}">${item.currentPct >= 0 ? '+' : ''}${pctStr}</div>
             </div>`;
         });
         container.innerHTML = html;
+    }
+
+    // 新增：切换可见性
+    function toggleVisibility(name) {
+        // 切换状态
+        visibilityState[name] = !visibilityState[name];
+        
+        // 如果取消勾选的是当前锁定的行业，则解锁
+        if (!visibilityState[name] && lockedSeries === name) {
+            lockedSeries = null;
+            updateVisuals(null); // 恢复全显
+        }
+
+        // 重新计算图表和列表 (保持当前的缩放范围)
+        const opt = myChart.getOption();
+        const startValue = opt.dataZoom[0].startValue;
+        const endValue = opt.dataZoom[0].endValue;
+        updateChartAndList(startValue, endValue);
     }
 
     function setupEvents() {
@@ -443,6 +493,8 @@
     }
 
     function applyHighlight(targetName) {
+        // 如果该行业被隐藏了，就不高亮
+        if (!visibilityState[targetName]) return;
         if (lockedSeries) return; 
         updateVisuals(targetName);
     }
@@ -453,6 +505,9 @@
     }
     
     function toggleLock(targetName) {
+        // 如果该行业被隐藏了，不能锁定
+        if (targetName && !visibilityState[targetName]) return;
+
         if (lockedSeries === targetName || targetName === null) {
             lockedSeries = null; 
             updateVisuals(null); 
@@ -464,6 +519,7 @@
 
     function updateVisuals(targetName) {
         const newStyles = currentRankedData.map(item => {
+            // 如果被隐藏，样式无所谓，因为 data 是空的
             const isTarget = targetName ? (item.name === targetName) : true;
             const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
             const width = isTarget ? (targetName ? 4 : 2) : 1;
@@ -476,10 +532,14 @@
         myChart.setOption({ series: newStyles });
 
         document.querySelectorAll('.list-item').forEach(el => {
+            const name = el.dataset.name;
+            // 如果是 unchecked 状态，保持 unchecked 样式，不参与高亮/变暗逻辑
+            if (!visibilityState[name]) return;
+
             if (!targetName) {
                 el.classList.remove('active-state', 'dimmed');
             } else {
-                if (el.dataset.name === targetName) {
+                if (name === targetName) {
                     el.classList.add('active-state');
                     el.classList.remove('dimmed');
                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
