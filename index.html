@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>行业强弱追踪</title>
+    <!-- 引入 ECharts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text-main: #1d1d1f;
+            --text-sec: #86868b;
+            --primary: #007aff;
+            --success: #34c759;
+            --danger: #ff3b30;
+            --shadow-card: 0 4px 12px rgba(0,0,0,0.04);
+            --radius-l: 18px;
+            --radius-m: 12px;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
+            background: var(--bg); color: var(--text-main); margin: 0; 
+            min-height: 100vh; display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased; 
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header { 
+            background: rgba(255, 255, 255, 0.85); 
+            backdrop-filter: saturate(180%) blur(20px); 
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            height: 50px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 16px; 
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .app-title { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px;}
+        .sync-info { font-size: 12px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        .sync-dot.online { background: var(--success); box-shadow: 0 0 6px rgba(52, 199, 89, 0.4); }
+        .sync-dot.loading { background: var(--primary); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        /* Controls */
+        .control-panel {
+            background: var(--bg); padding: 15px 16px; flex-shrink: 0;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+
+        .input-group {
+            background: var(--card); padding: 12px; border-radius: var(--radius-m);
+            box-shadow: var(--shadow-card); display: flex; align-items: center; justify-content: space-between;
+        }
+        
+        .label-text { font-size: 13px; font-weight: 600; color: var(--text-sec); }
+        
+        .date-inp {
+            border: none; background: #f2f2f7; color: var(--primary);
+            padding: 6px 10px; border-radius: 8px; font-size: 13px; font-family: inherit; font-weight: 500;
+            outline: none; text-align: center; width: 110px;
+        }
+
+        .rank-inputs { display: flex; align-items: center; gap: 8px; }
+        .num-inp {
+            border: none; background: #f2f2f7; color: var(--text-main);
+            padding: 6px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            width: 40px; text-align: center; outline: none;
+        }
+
+        /* Chart Container */
+        .main-content {
+            flex: 1; padding: 0 16px 20px 16px; display: flex; flex-direction: column;
+        }
+        
+        .chart-card {
+            background: var(--card); border-radius: var(--radius-l);
+            box-shadow: var(--shadow-card);
+            flex: 1; min-height: 400px; position: relative;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        #chart-container {
+            width: 100%; height: 100%;
+        }
+
+        /* Loading Overlay */
+        .loading-mask {
+            position: absolute; inset: 0; background: rgba(255,255,255,0.8);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; font-size: 14px; color: var(--text-sec);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .loading-mask.show { opacity: 1; pointer-events: auto; }
+
+        /* List View (Bottom) */
+        .ranking-list {
+            margin-top: 15px;
+            background: var(--card); border-radius: var(--radius-l);
+            box-shadow: var(--shadow-card); padding: 10px 0;
+        }
+        .list-header {
+            padding: 0 16px 8px 16px; font-size: 12px; color: var(--text-sec); border-bottom: 1px solid #f5f5f7;
+            display: flex; justify-content: space-between;
+        }
+        .list-item {
+            padding: 12px 16px; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center;
+            font-size: 14px;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .idx-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .idx-color { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
+        .up { color: var(--danger); }
+        .down { color: var(--success); }
+
+        /* Button */
+        .btn-refresh {
+            background: var(--primary); color: white; border: none;
+            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0,122,255,0.3); cursor: pointer;
+        }
+        .btn-refresh:active { transform: scale(0.96); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="app-title"><i class="fas fa-chart-line" style="color:var(--primary)"></i> 市场风向标</div>
+    <div class="sync-info">
+        <div id="syncDot" class="sync-dot"></div>
+        <span id="updateTime">连接中...</span>
+    </div>
+</header>
+
+<div class="control-panel">
+    <div class="input-group">
+        <span class="label-text">时间范围</span>
+        <div style="display:flex; gap:5px; align-items:center;">
+            <input type="date" id="startDate" class="date-inp" onchange="renderChart()">
+            <span style="color:#ccc">-</span>
+            <input type="date" id="endDate" class="date-inp" onchange="renderChart()">
+        </div>
+    </div>
+    
+    <div class="input-group">
+        <span class="label-text">涨幅排名 (前N名)</span>
+        <div class="rank-inputs">
+            <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="renderChart()">
+            <span style="color:#ccc">至</span>
+            <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="renderChart()">
+            <button class="btn-refresh" onclick="fetchData()"><i class="fas fa-sync-alt"></i></button>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="chart-card">
+        <div class="loading-mask" id="loader">
+            <i class="fas fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; color:var(--primary)"></i>
+            <span>正在读取数据...</span>
+        </div>
+        <div id="chart-container"></div>
+    </div>
+
+    <div class="ranking-list" id="rankList">
+        <!-- 列表通过 JS 生成 -->
+    </div>
+</div>
+
+<script>
+    // 全局数据存储
+    let rawData = null; // 存放 fetch 下来的 JSON
+    let myChart = null;
+
+    // 初始化日期：默认显示过去20天
+    function initDate() {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - 30); // 默认看30天
+        
+        document.getElementById('endDate').valueAsDate = end;
+        document.getElementById('startDate').valueAsDate = start;
+    }
+
+    // 核心函数：获取数据
+    async function fetchData() {
+        const loader = document.getElementById('loader');
+        const dot = document.getElementById('syncDot');
+        const timeTxt = document.getElementById('updateTime');
+        
+        loader.classList.add('show');
+        dot.className = 'sync-dot loading';
+        timeTxt.innerText = '更新中';
+
+        try {
+            // 注意：这里读取的是同目录下的 industry_data.json
+            // 添加时间戳防止浏览器缓存
+            const response = await fetch('industry_data.json?t=' + new Date().getTime());
+            
+            if (!response.ok) throw new Error("无法加载数据文件");
+            
+            rawData = await response.json();
+            
+            // 更新状态
+            dot.className = 'sync-dot online';
+            timeTxt.innerText = '数据日期: ' + (rawData.last_update || '未知');
+            
+            renderChart();
+            
+        } catch (error) {
+            console.error(error);
+            dot.className = 'sync-dot';
+            dot.style.background = 'var(--danger)';
+            timeTxt.innerText = '加载失败';
+            alert("无法读取数据，请确保 industry_data.json 存在且已推送到 GitHub");
+        } finally {
+            loader.classList.remove('show');
+        }
+    }
+
+    // 核心函数：渲染图表
+    function renderChart() {
+        if (!rawData) return;
+        
+        // 1. 获取参数
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+        const nStart = parseInt(document.getElementById('rankStart').value);
+        const nEnd = parseInt(document.getElementById('rankEnd').value);
+
+        // 2. 数据切片与处理
+        const allDates = rawData.dates;
+        // 找到索引范围
+        let sIdx = allDates.findIndex(d => d >= sDate);
+        let eIdx = allDates.findIndex(d => d > eDate);
+        
+        if (sIdx === -1) sIdx = 0;
+        if (eIdx === -1) eIdx = allDates.length;
+
+        const slicedDates = allDates.slice(sIdx, eIdx);
+        if (slicedDates.length === 0) {
+            alert("该时间段无数据");
+            return;
+        }
+
+        // 3. 计算区间涨幅并排序
+        let rankings = [];
+        const industryNames = Object.keys(rawData.data);
+
+        industryNames.forEach(name => {
+            const prices = rawData.data[name];
+            // 容错处理
+            if (!prices || prices.length < eIdx) return;
+
+            const pStart = prices[sIdx];
+            const pEnd = prices[eIdx - 1]; // 区间最后一个点
+
+            if (pStart && pEnd) {
+                const pct = (pEnd - pStart) / pStart;
+                rankings.push({ name: name, pct: pct, prices: prices.slice(sIdx, eIdx) });
+            }
+        });
+
+        // 排序：从高到低
+        rankings.sort((a, b) => b.pct - a.pct);
+
+        // 4. 截取前 N-M 名
+        const targetData = rankings.slice(nStart - 1, nEnd);
+
+        // 5. 生成 ECharts 数据
+        // 计算净值：所有数据除以起点的价格
+        const series = targetData.map(item => {
+            const base = item.prices[0];
+            const normalized = item.prices.map(p => parseFloat((p / base).toFixed(4)));
+            return {
+                name: item.name,
+                type: 'line',
+                smooth: true,
+                symbol: 'none', // 不显示点，线更平滑
+                data: normalized,
+                emphasis: { focus: 'series' }
+            };
+        });
+
+        // 6. 绘图
+        if (!myChart) myChart = echarts.init(document.getElementById('chart-container'));
+
+        const option = {
+            tooltip: {
+                trigger: 'axis',
+                formatter: function(params) {
+                    let res = params[0].name + '<br/>';
+                    // 按净值从高到低排序 tooltip
+                    params.sort((a,b) => b.value - a.value);
+                    params.forEach(item => {
+                        res += `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>${item.seriesName}: ${item.value}<br/>`;
+                    });
+                    return res;
+                },
+                axisPointer: { type: 'cross' }
+            },
+            grid: {
+                left: '3%', right: '4%', bottom: '3%', top: '10%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: slicedDates,
+                axisLine: { lineStyle: { color: '#ccc' } },
+                axisLabel: { color: '#666' }
+            },
+            yAxis: {
+                type: 'value',
+                scale: true, // 不从0开始
+                splitLine: { lineStyle: { color: '#eee' } }
+            },
+            series: series,
+            color: [
+                '#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', 
+                '#007aff', '#5856d6', '#ff2d55', '#8e8e93', '#34c759'
+            ]
+        };
+
+        myChart.setOption(option, true);
+
+        // 7. 更新底部列表
+        renderRankList(targetData, option.color);
+    }
+
+    function renderRankList(data, colors) {
+        const container = document.getElementById('rankList');
+        let html = `<div class="list-header"><span>行业名称</span><span>区间涨幅</span></div>`;
+        
+        data.forEach((item, index) => {
+            const color = colors[index % colors.length];
+            const pctStr = (item.pct * 100).toFixed(2) + '%';
+            const cls = item.pct >= 0 ? 'up' : 'down';
+            
+            html += `
+            <div class="list-item">
+                <div class="idx-name">
+                    <span class="idx-color" style="background:${color}"></span>
+                    ${index + 1}. ${item.name}
+                </div>
+                <div class="idx-val ${cls}">${item.pct >= 0 ? '+' : ''}${pctStr}</div>
+            </div>`;
+        });
+        
+        container.innerHTML = html;
+    }
+
+    // 窗口大小改变时重绘
+    window.addEventListener('resize', () => {
+        if(myChart) myChart.resize();
+    });
+
+    // 启动
+    initDate();
+    fetchData(); // 页面加载时自动获取
+
+</script>
+</body>
+</html>
