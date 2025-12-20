@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (完美交互版)</title>
+    <title>行业强弱追踪 (视觉微调版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -75,7 +75,7 @@
         }
         .list-item:hover { background: #f9f9f9; }
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
-        .list-item.dimmed { opacity: 0.2; filter: grayscale(100%); }
+        .list-item.dimmed { opacity: 0.3; filter: grayscale(100%); } /* 列表也稍微调亮一点 */
         .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .idx-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;}
         .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
@@ -232,32 +232,31 @@
             animation: false, 
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
             
-            // --- 核心修改：Tooltip 逻辑优化 ---
+            // --- 核心修改：Tooltip 视觉微调 ---
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
-                // 确保浮层在最上层，防止被遮挡
                 z: 100,
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
                     
-                    // 按数值降序排列，方便阅读
                     params.sort((a,b) => b.value - a.value);
 
                     params.forEach(p => {
-                        // 判断是否被“变暗”
-                        // 如果有 lockedSeries，且当前不是 lockedSeries，则判定为变暗
                         const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
                         
-                        // 样式控制
-                        const opacity = isDimmed ? '0.3' : '1';
+                        // 1. 文字颜色：变暗的用灰色 #999，高亮的用默认深色
+                        const textColor = isDimmed ? '#999' : '#333';
+                        // 2. 字重：高亮的加粗，变暗的正常
                         const fontWeight = isDimmed ? 'normal' : 'bold';
-                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${opacity}"></span>`;
+                        // 3. 小圆点透明度：变暗的稍微淡一点
+                        const dotOpacity = isDimmed ? '0.5' : '1';
+                        
+                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         
-                        // 组合 HTML
-                        html += `<div style="opacity:${opacity}; font-weight:${fontWeight}">
+                        html += `<div style="color:${textColor}; font-weight:${fontWeight}">
                                     ${colorDot}${p.seriesName}: ${valStr}
                                  </div>`;
                     });
@@ -410,11 +409,16 @@
             updateVisuals(targetName);
         }
     }
+    // --- 核心修改：视觉状态更新逻辑 ---
     function updateVisuals(targetName) {
         const newStyles = currentRankedData.map(item => {
             const isTarget = item.name === targetName;
             return {
-                lineStyle: { opacity: isTarget ? 1 : 0.1, width: isTarget ? 4 : 1 },
+                lineStyle: { 
+                    // 调整这里：从 0.1 改为 0.35，保证背景线条可见
+                    opacity: isTarget ? 1 : 0.35, 
+                    width: isTarget ? 4 : 1 
+                },
                 z: isTarget ? 10 : 2
             };
         });
