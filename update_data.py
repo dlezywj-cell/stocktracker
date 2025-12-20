@@ -9,50 +9,54 @@ def fetch_and_save_data():
     print("Step 1: 获取申万(Shenwan)二级行业列表...")
     
     try:
-        # 获取申万二级行业分类列表
-        # index_code: 801010, index_name: 农林牧渔...
-        sw_boards = ak.index_classify_sw(level="L2")
+        # 修正接口: 使用 sw_index_second_info 获取申万二级列表
+        # 返回列通常为: 行业代码, 行业名称, ...
+        sw_boards = ak.sw_index_second_info()
         print(f"SUCCESS: 获取到 {len(sw_boards)} 个申万二级行业")
     except Exception as e:
-        print(f"ERROR: 获取申万行业列表失败。可能接口变动或网络问题。")
-        # 备用方案：如果列表获取失败，可以硬编码几个测试，或者直接抛出
+        print(f"ERROR: 获取申万行业列表失败。")
         raise e
 
-    # 设定时间范围 (最近2年，减少数据量避免超时)
-    # 申万接口比较慢，建议适当缩短时间，或者GitHub Actions中增加超时设置
+    # 设定时间范围 (最近2年)
     start_date = (datetime.datetime.now() - datetime.timedelta(days=730)).strftime("%Y%m%d")
     end_date = datetime.datetime.now().strftime("%Y%m%d")
 
-    # 用于存储所有行业的临时字典: { "行业名": Series(index=Date, value=Close) }
     data_store = {}
     
     print("Step 2: 循环获取行业历史数据 (速度较慢，请耐心等待)...")
     
-    # 申万接口不稳定，增加重试逻辑
     max_retries = 3
-    
     total = len(sw_boards)
-    for i, row in enumerate(sw_boards.itertuples()):
-        code = row.index_code
-        name = row.index_name
+    
+    # 遍历 DataFrame 的每一行
+    for i, row in sw_boards.iterrows():
+        # 注意：不同版本的 akshare 返回的列名可能是中文
+        # 通常是 "行业代码" 和 "行业名称"
+        code = str(row['行业代码']).split('.')[0] # 确保去掉可能存在的后缀如 .SI
+        name = row['行业名称']
         
-        # 简单进度显示
         print(f"[{i+1}/{total}] 获取 {name} ({code})...", end="", flush=True)
         
         fetched = False
         for attempt in range(max_retries):
             try:
                 # 接口: ak.index_hist_sw
-                # 来源: 申万宏源官网
+                # 参数: symbol=纯数字代码 (如 801010)
                 df = ak.index_hist_sw(symbol=code, period="day")
                 
                 if df is None or df.empty:
+                    # 某些行业可能已停止维护或刚上市
                     raise ValueError("Empty Data")
 
-                # 数据清洗
-                # akshare返回列名通常为: 日期, 开盘, 最高, 最低, 收盘, ...
-                df['日期'] = pd.to_datetime(df['日期'])
-                df.set_index('日期', inplace=True)
+                # 清洗数据
+                # 确保日期列格式正确
+                if '日期' in df.columns:
+                    df['日期'] = pd.to_datetime(df['日期'])
+                    df.set_index('日期', inplace=True)
+                else:
+                    # 防止列名变动
+                    df.index = pd.to_datetime(df.index)
+                
                 df.sort_index(inplace=True)
                 
                 # 截取时间段
@@ -62,52 +66,44 @@ def fetch_and_save_data():
                 if df_subset.empty:
                     print(f" 无区间数据 - 跳过")
                 else:
-                    # 只取收盘价，存入字典
+                    # 只取收盘价
                     data_store[name] = df_subset['收盘']
                     print(f" 成功 ({len(df_subset)}条)")
                 
                 fetched = True
-                break # 成功则跳出重试
+                break 
                 
             except Exception as e:
                 if attempt < max_retries - 1:
-                    time.sleep(2) # 失败等待2秒
+                    time.sleep(2)
                 else:
-                    print(f" 失败: {e}")
+                    print(f" 失败") # 不打印详细堆栈以保持日志整洁
 
-        # 稍微暂停，避免触发申万官网的反爬频率限制
-        time.sleep(1)
+        # 暂停以防反爬
+        time.sleep(0.5)
 
     print(f"\nStep 3: 数据清洗与对齐...")
 
     if not data_store:
-        raise ValueError("严重错误：没有获取到任何申万数据！请检查网络或AkShare接口状态。")
+        raise ValueError("严重错误：没有获取到任何申万数据！")
 
-    # --- 核心对齐逻辑 ---
-    # 1. 将字典转换为 DataFrame，列名就是行业名，索引是日期
-    #    Pandas 会自动合并所有日期，某个行业某天没数据会填 NaN
+    # 1. 对齐所有日期
     df_all = pd.DataFrame(data_store)
-    
-    # 2. 按日期排序
     df_all.sort_index(inplace=True)
     
-    # 3. 处理缺失值 (NaN)
-    #    策略：使用前值填充 (ffill)，如果前面也没值(刚上市)，填 0 或 第一个有效值
-    #    这样保证了所有行业的数组长度完全一致，对应同一个 dates 数组
+    # 2. 填充缺失值 (ffill保证连续性, 0处理开头)
     df_all.fillna(method='ffill', inplace=True)
-    df_all.fillna(0, inplace=True) # 处理最开始的空值
+    df_all.fillna(0, inplace=True)
 
-    # 4. 提取公共日期列表
+    # 3. 提取日期
     common_dates = df_all.index.strftime('%Y-%m-%d').tolist()
     
-    # 5. 构建最终字典
+    # 4. 格式化数据
     final_data_map = {}
     for col in df_all.columns:
-        # 将 numpy 数组转为 list，保留浮点数精度
-        # round(4) 减小文件体积
         final_data_map[col] = df_all[col].round(4).tolist()
 
-    # 6. 构建 JSON
+    # 5. 保存
     final_json = {
         "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "source": "Shenwan Level 2 (AkShare)",
@@ -115,7 +111,6 @@ def fetch_and_save_data():
         "data": final_data_map
     }
 
-    # 7. 保存
     with open("industry_data.json", "w", encoding="utf-8") as f:
         json.dump(final_json, f, ensure_ascii=False, separators=(',', ':'))
     
