@@ -3,14 +3,13 @@ import pandas as pd
 import json
 import datetime
 import time
+import random  # 引入 random 库
 import os
 
 def fetch_and_save_data():
     print("Step 1: 获取申万(Shenwan)二级行业列表...")
     
     try:
-        # 修正接口: 使用 sw_index_second_info 获取申万二级列表
-        # 返回列通常为: 行业代码, 行业名称, ...
         sw_boards = ak.sw_index_second_info()
         print(f"SUCCESS: 获取到 {len(sw_boards)} 个申万二级行业")
     except Exception as e:
@@ -28,45 +27,39 @@ def fetch_and_save_data():
     max_retries = 3
     total = len(sw_boards)
     
-    # 遍历 DataFrame 的每一行
     for i, row in sw_boards.iterrows():
-        # 注意：不同版本的 akshare 返回的列名可能是中文
-        # 通常是 "行业代码" 和 "行业名称"
-        code = str(row['行业代码']).split('.')[0] # 确保去掉可能存在的后缀如 .SI
+        code = str(row['行业代码']).split('.')[0]
         name = row['行业名称']
         
         print(f"[{i+1}/{total}] 获取 {name} ({code})...", end="", flush=True)
         
+        # === 唯一修改的地方 ===
+        # 原来是 time.sleep(0.5)，太快容易被封。
+        # 改成 1.5 秒，虽然总耗时会多几分钟，但每天只跑一次，稳最重要。
+        time.sleep(1.5) 
+        
         fetched = False
         for attempt in range(max_retries):
             try:
-                # 接口: ak.index_hist_sw
-                # 参数: symbol=纯数字代码 (如 801010)
                 df = ak.index_hist_sw(symbol=code, period="day")
                 
                 if df is None or df.empty:
-                    # 某些行业可能已停止维护或刚上市
                     raise ValueError("Empty Data")
 
-                # 清洗数据
-                # 确保日期列格式正确
                 if '日期' in df.columns:
                     df['日期'] = pd.to_datetime(df['日期'])
                     df.set_index('日期', inplace=True)
                 else:
-                    # 防止列名变动
                     df.index = pd.to_datetime(df.index)
                 
                 df.sort_index(inplace=True)
                 
-                # 截取时间段
                 mask = (df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))
                 df_subset = df.loc[mask]
                 
                 if df_subset.empty:
                     print(f" 无区间数据 - 跳过")
                 else:
-                    # 只取收盘价
                     data_store[name] = df_subset['收盘']
                     print(f" 成功 ({len(df_subset)}条)")
                 
@@ -75,35 +68,27 @@ def fetch_and_save_data():
                 
             except Exception as e:
                 if attempt < max_retries - 1:
-                    time.sleep(2)
+                    # 失败重试时多睡一会
+                    time.sleep(3)
                 else:
-                    print(f" 失败") # 不打印详细堆栈以保持日志整洁
-
-        # 暂停以防反爬
-        time.sleep(0.5)
+                    print(f" 失败") 
 
     print(f"\nStep 3: 数据清洗与对齐...")
 
     if not data_store:
         raise ValueError("严重错误：没有获取到任何申万数据！")
 
-    # 1. 对齐所有日期
     df_all = pd.DataFrame(data_store)
     df_all.sort_index(inplace=True)
-    
-    # 2. 填充缺失值 (ffill保证连续性, 0处理开头)
     df_all.fillna(method='ffill', inplace=True)
     df_all.fillna(0, inplace=True)
 
-    # 3. 提取日期
     common_dates = df_all.index.strftime('%Y-%m-%d').tolist()
     
-    # 4. 格式化数据
     final_data_map = {}
     for col in df_all.columns:
         final_data_map[col] = df_all[col].round(4).tolist()
 
-    # 5. 保存
     final_json = {
         "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "source": "Shenwan Level 2 (AkShare)",
