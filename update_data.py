@@ -9,81 +9,90 @@ def fetch_and_save_data():
     print("Step 1: 准备获取申万二级行业数据...")
     
     # 1. 获取申万二级行业列表
-    # 申万行业分为 L1(一级), L2(二级), L3(三级)
     try:
-        print("正在获取申万二级行业代码列表...")
-        # 获取申万分类标准（最新版）
+        print("正在获取申万二级行业代码列表 (ak.index_class_sw)...")
+        # 这个接口需要 openpyxl 支持
         sw_class = ak.index_class_sw(level="L2")
-        # sw_class 通常包含: index_code, index_name
-        # 我们需要清洗一下数据，确保拿到的是 code 和 name
-        print(f"获取到 {len(sw_class)} 个申万二级行业")
+        print(f"SUCCESS: 获取到 {len(sw_class)} 个申万二级行业")
     except Exception as e:
-        print(f"ERROR: 获取行业列表失败: {e}")
+        print(f"ERROR: 获取行业列表失败。可能原因: 1.网络超时 2.缺少openpyxl库。错误信息: {e}")
         raise e
 
     # 2. 设定时间范围
     end_date = datetime.datetime.now()
-    start_date = end_date - datetime.timedelta(days=730) # 最近2年
-    # 注意：申万接口通常不需要 '20230101' 这种格式，或者内部会自动处理，我们保持 datetime 对象备用
+    start_date = end_date - datetime.timedelta(days=730) 
+    
+    # Legule 接口需要的日期格式是 'YYYY-MM-DD' 或 datetime
+    # 我们将在循环中处理
     
     all_data = {}
     common_dates = []
     success_count = 0
     
-    # 3. 循环获取数据
-    # 申万二级行业数量较多（100+），且接口可能有限流，我们加一点延时
-    for index, row in sw_class.iterrows():
+    # 3. 循环获取数据 (改用 Legule 接口)
+    # 我们只取前 150 个，防止异常
+    target_list = sw_class
+    
+    print("Step 2: 开始循环获取具体指数数据 (Source: Legule)...")
+
+    for index, row in target_list.iterrows():
         name = row['index_name']
-        code = row['index_code'] # 例如 801010
+        code = row['index_code'] # 格式如 801010
         
         try:
-            # print(f"正在获取: {name} ({code}) ...")
+            # 接口: ak.sw_index_daily_indicator
+            # 数据源: 乐咕乐股 (比新浪稳定)
+            # 包含字段: date, close, pe, pb...
+            df = ak.sw_index_daily_indicator(symbol=code, start_date="20200101", end_date=datetime.datetime.now().strftime("%Y%m%d"), data_type="Day")
             
-            # 使用 AkShare 的申万指数历史接口
-            # 注意：ak.index_hist_sw(symbol="801010")
-            df = ak.index_hist_sw(symbol=code, period="day")
-            
-            # 数据清洗：确保日期格式统一
-            # 申万接口返回的日期通常是 datetime 或 string
-            df['日期'] = pd.to_datetime(df['日期'])
+            if df is None or df.empty:
+                print(f"警告: {name} ({code}) 返回空数据")
+                continue
+
+            # 数据清洗
+            # 乐咕乐股返回的日期通常是 date 类型或字符串
+            df['date'] = pd.to_datetime(df['date'])
             
             # 筛选时间范围
-            mask = (df['日期'] >= start_date) & (df['日期'] <= end_date)
+            mask = (df['date'] >= start_date) & (df['date'] <= end_date)
             df_filtered = df.loc[mask].copy()
             
-            # 转为字符串列表用于 JSON
-            dates = df_filtered['日期'].dt.strftime('%Y-%m-%d').tolist()
-            closes = df_filtered['收盘'].tolist()
+            # 只要日期和收盘价
+            dates = df_filtered['date'].dt.strftime('%Y-%m-%d').tolist()
+            closes = df_filtered['close'].tolist()
             
-            # 必须保证数据不为空
             if len(dates) == 0:
                 continue
 
-            # 以第一个成功获取的数据作为日期基准（通常指数的交易日是一样的）
+            # 以第一个成功的数据作为基准
             if not common_dates:
                 common_dates = dates
             
-            # 数据对齐检查（简单版）：长度一致才收录
-            # 复杂版应该用 merge，但在 GitHub Actions 环境下，只要是指数，交易日基本一致
+            # 数据对齐 (简单长度判断)
             if len(dates) == len(common_dates):
                 all_data[name] = closes
                 success_count += 1
             else:
-                # 如果长度对不上（比如新发布的指数），为了前端画图不报错，暂时跳过
-                # 或者截取对齐，这里选择跳过以保证稳定性
-                print(f"跳过 {name}: 数据长度不一致 ({len(dates)} vs {len(common_dates)})")
+                # 长度不一致时，尝试截取对齐（以最短的为准，或者丢弃）
+                # 为了图表稳定，这里如果差异不大(比如少几天)，可以考虑对齐逻辑
+                # 但简单起见，暂且跳过严重不一致的
+                # print(f"跳过 {name}: 长度不一致 {len(dates)} vs {len(common_dates)}")
+                
+                # 进阶对齐：如果是最近上市的，数据肯定少，前端会自动处理 null
+                # 这里我们只存完全匹配的，或者你可以放宽限制
+                pass
 
-            # 稍微休息一下，防止被封 IP
-            # time.sleep(0.2) 
+            # 稍微延时，虽然Legule比较耐抗
+            time.sleep(0.1)
 
         except Exception as e:
             print(f"获取 {name} ({code}) 失败: {e}")
             continue
 
-    print(f"Step 4: 数据获取结束。成功: {success_count} 个")
+    print(f"Step 3: 数据获取结束。成功: {success_count} 个")
 
     if success_count == 0:
-        raise ValueError("没有获取到任何数据！")
+        raise ValueError("没有获取到任何数据！请检查网络或接口状态。")
 
     # 4. 构建 JSON
     final_json = {
@@ -96,7 +105,7 @@ def fetch_and_save_data():
     with open("industry_data.json", "w", encoding="utf-8") as f:
         json.dump(final_json, f, ensure_ascii=False, separators=(',', ':'))
     
-    print("SUCCESS: industry_data.json 已更新为申万二级行业数据")
+    print("SUCCESS: industry_data.json 文件生成成功")
 
 if __name__ == "__main__":
     fetch_and_save_data()
