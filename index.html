@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (动态归一化版)</title>
+    <title>行业强弱追踪 (真·动态归一化)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -121,7 +121,7 @@
 <body>
 
 <header>
-    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪 Pro</div>
+    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪 (动态基准)</div>
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
@@ -152,8 +152,8 @@
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#999;font-size:10px;">(拖动滑块缩放)</span>
-            <span>区间涨幅</span>
+            <span style="font-weight:normal;color:#999;font-size:10px;">(拖动图表缩放)</span>
+            <span>选定区间涨幅</span>
         </div>
         <div class="list-body" id="rankList"></div>
     </div>
@@ -164,7 +164,9 @@
     let myChart = null;
     let lockedSeries = null;
     let currentRankedData = []; 
-    
+    // 全局保存日期数组，方便各处调用
+    let globalAllDates = [];
+
     function initDate() {
         const end = new Date();
         const start = new Date();
@@ -184,10 +186,10 @@
             const response = await fetch('industry_data.json?t=' + Date.now());
             if (!response.ok) throw new Error("Status: " + response.status);
             rawData = await response.json();
+            globalAllDates = rawData.dates; // 保存全局日期
             dot.className = 'sync-dot online';
             timeTxt.innerText = (rawData.last_update || '未知').split(' ')[0];
             
-            // 首次加载，计算排名并初始化图表
             calculateRankAndRender(true); 
         } catch (error) {
             console.error(error);
@@ -199,7 +201,8 @@
         }
     }
 
-    // 1. 计算排名逻辑 (决定谁上榜)
+    // 1. 计算排名 (Ranking)
+    // 这一步决定了“谁显示在图表上”，但不限制图表的历史数据范围
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
         lockedSeries = null;
@@ -208,70 +211,87 @@
         const eDate = document.getElementById('endDate').value;
         const nStart = parseInt(document.getElementById('rankStart').value);
         const nEnd = parseInt(document.getElementById('rankEnd').value);
-        const allDates = rawData.dates;
 
-        // 索引查找
-        let sIdx = allDates.findIndex(d => d >= sDate);
+        // 查找用于排名的索引区间
+        let sIdx = globalAllDates.findIndex(d => d >= sDate);
         if (sIdx === -1) sIdx = 0;
-        let eIdx = allDates.findIndex(d => d > eDate);
-        if (eIdx === -1) eIdx = allDates.length;
+        let eIdx = globalAllDates.findIndex(d => d > eDate);
+        if (eIdx === -1) eIdx = globalAllDates.length;
 
-        // 计算区间涨幅用于排名
         let tempRank = [];
         Object.keys(rawData.data).forEach(name => {
             const prices = rawData.data[name];
+            // 只有数据够长才参与排名，但参与后我们保留它的【全部历史数据】
             if (!prices || prices.length <= sIdx) return;
             
+            // 计算排名用的涨幅
             const startPrice = prices[sIdx];
             const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
             
             if (startPrice && endPrice) {
                 const pct = (endPrice - startPrice) / startPrice;
-                // 保存原始价格数据 (Raw Prices)，而不是归一化后的数据
-                // 因为归一化要根据缩放动态计算
-                tempRank.push({ name: name, pct: pct, rawData: prices });
+                // 关键点：保存 fullData (全部历史)，而不仅仅是 subset
+                tempRank.push({ name: name, pct: pct, fullData: prices });
             }
         });
 
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
 
-        // 如果是初始化或日期改变，重绘整个图表
-        // 传入 sIdx 和 eIdx 用于设定初始的 DataZoom 范围
-        initChart(allDates, isInit ? sIdx : null, isInit ? eIdx : null);
+        // 初始化图表
+        // 传入 sIdx 和 eIdx 仅仅是为了设定初始的 Zoom 视窗位置
+        initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
     // 2. 初始化图表
-    function initChart(allDates, startIdx, endIdx) {
+    function initChart(startIdx, endIdx) {
         if (!myChart) {
             myChart = echarts.init(document.getElementById('chart-container'));
             setupEvents();
         }
 
-        // 初始数据：先填入原始数据，马上会被 updateNormalization 覆盖
+        // 初始化时，Series 先填入【全量原始数据】，不做归一化
+        // 归一化将在 setOption 后的 updateDynamicNormalization 中完成
         const series = currentRankedData.map(item => ({
             name: item.name,
             type: 'line',
             smooth: true,
             showSymbol: false, 
             lineStyle: { width: 2 },
-            data: item.rawData, 
+            data: item.fullData, // 全量数据
             emphasis: { disabled: true },
             z: 2 
         }));
 
+        // 如果没有传入范围，尝试获取当前图表状态，或者默认显示最后30天
+        if (startIdx === null) {
+            const model = myChart.getModel();
+            if(model) {
+                 const dz = model.getComponent('dataZoom', 0);
+                 if(dz) {
+                     const axisProxy = dz.getAxisProxy('x');
+                     const range = axisProxy.getMinMaxSpan();
+                     startIdx = Math.floor(range.min);
+                     endIdx = Math.ceil(range.max);
+                 }
+            }
+        }
+        // 兜底默认值
+        if (startIdx === null || startIdx === undefined) startIdx = Math.max(0, globalAllDates.length - 30);
+        if (endIdx === null || endIdx === undefined) endIdx = globalAllDates.length;
+
         const option = {
-            animation: false, // 关闭动画以获得极致的拖动响应速度
+            animation: false, // 必须关闭动画，否则动态计算会闪烁
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
                 formatter: function(params) {
+                    if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
                     params.forEach(p => {
                         if (lockedSeries && p.seriesName !== lockedSeries) return;
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};"></span>`;
-                        // 显示相对于当前起点的涨幅
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `${colorDot}<b>${p.seriesName}</b>: ${valStr}<br/>`;
                     });
@@ -280,14 +300,14 @@
             },
             xAxis: {
                 type: 'category', 
-                data: allDates,
+                data: globalAllDates, // 全量日期
                 boundaryGap: false,
                 axisLine: { lineStyle: { color: '#eee' } },
                 axisLabel: { color: '#999', fontSize: 10 }
             },
             yAxis: {
                 type: 'value', 
-                scale: true, // 关键：让Y轴自动缩放适应当前形态
+                scale: true, 
                 splitLine: { lineStyle: { color: '#f5f5f7' } },
                 axisLabel: { color: '#999', fontSize: 10, formatter: (val) => ((val-1)*100).toFixed(0) + '%' }
             },
@@ -300,7 +320,7 @@
                     height: 20,
                     borderColor: 'transparent',
                     handleSize: '80%',
-                    // 如果有传入范围，则设定；否则保持当前状态或默认
+                    // 设定初始视窗
                     startValue: startIdx,
                     endValue: endIdx
                 },
@@ -315,88 +335,83 @@
             color: ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e']
         };
 
-        myChart.setOption(option, true);
+        myChart.setOption(option, true); // 不合并，彻底重绘
         
-        // 立即执行一次归一化，确保看到的画面是对的
-        // 如果没有指定范围，就获取当前的 zoom 范围
-        if (startIdx == null) {
-             const model = myChart.getModel().getComponent('dataZoom', 0);
-             const range = model.getAxisProxy('x').getMinMaxSpan();
-             startIdx = Math.floor(range.min);
-        }
+        // 关键一步：图表渲染后，立刻根据当前的 startValue 进行一次归一化
         updateDynamicNormalization(startIdx);
         
         renderRankList(option.color);
     }
 
-    // 3. 核心：动态归一化更新
-    // 无论怎么缩放，只要调用这个，就会把所有线重置为以 startIdx 为基准
-    function updateDynamicNormalization(startIdx) {
+    // 3. 动态归一化 (Dynamic Rebase)
+    // 这是实现你要求的核心：每次视图变化，都以当前视图最左边的索引为基准
+    function updateDynamicNormalization(viewStartIdx) {
         if (!currentRankedData.length) return;
-        startIdx = Math.max(0, startIdx);
+        
+        // 确保索引不越界
+        viewStartIdx = Math.max(0, Math.min(viewStartIdx, globalAllDates.length - 1));
 
-        const newSeries = currentRankedData.map(item => {
-            // 获取当前可视区域左边缘的价格作为基准 (Base Price)
-            // 容错：如果 startIdx 超出数据范围，取最后一个有效数据
-            const baseIndex = Math.min(startIdx, item.rawData.length - 1);
-            const basePrice = item.rawData[baseIndex];
+        const newSeriesData = currentRankedData.map(item => {
+            // 取出当前视窗起点的价格作为基准
+            let basePrice = item.fullData[viewStartIdx];
             
-            // 如果基准价无效（比如停牌），防止除以0
-            if (!basePrice) return item.rawData;
+            // 容错：如果那天没价格（比如停牌），向前找一个最近的有效价格，或者向后找
+            if (!basePrice || basePrice === 0) {
+                 // 简单处理：如果基准是0或空，尝试用整个数组的第一个有效值，或者保持原值避免报错
+                 // 更好的策略：向后搜索
+                 for(let k = viewStartIdx; k < item.fullData.length; k++){
+                     if(item.fullData[k]) { basePrice = item.fullData[k]; break; }
+                 }
+            }
 
-            // 全量重新计算：Price / BasePrice
-            return item.rawData.map(p => parseFloat((p / basePrice).toFixed(4)));
+            if (!basePrice) return item.fullData; // 实在找不到，就放弃归一化
+
+            // 全量数据除以这个新的基准
+            return item.fullData.map(p => {
+                if(!p) return null;
+                return parseFloat((p / basePrice).toFixed(4));
+            });
         });
 
-        // 增量更新数据，性能很高
+        // 增量更新图表数据
         myChart.setOption({
-            series: newSeries.map(data => ({ data: data }))
+            series: newSeriesData.map(data => ({ data: data }))
         });
     }
 
     // 4. 事件监听
     function setupEvents() {
-        // DataZoom 事件：监听缩放和拖动
+        // DataZoom 监听：这是实现缩放重算的关键
         myChart.on('dataZoom', function(params) {
-            // 获取当前可视范围的起点索引
+            // 获取当前 DataZoom 的状态（像素/百分比转换为索引）
             const model = myChart.getModel().getComponent('dataZoom', 0);
             const axisProxy = model.getAxisProxy('x');
             const range = axisProxy.getMinMaxSpan();
-            const startIdx = Math.floor(range.min);
-            const endIdx = Math.ceil(range.max);
-
-            // 实时重算归一化
-            updateDynamicNormalization(startIdx);
             
-            // 同步更新顶部的日期显示（视觉反馈）
-            if (rawData && rawData.dates) {
-                // 不触发 input change，只更新显示
-                const d1 = rawData.dates[Math.max(0, startIdx)];
-                const d2 = rawData.dates[Math.min(endIdx, rawData.dates.length-1)];
-                if (d1) document.getElementById('startDate').value = d1;
-                if (d2) document.getElementById('endDate').value = d2;
+            // 计算当前视窗的起止索引
+            const sIdx = Math.floor(range.min);
+            const eIdx = Math.ceil(range.max);
+
+            // 1. 执行动态归一化 (基准变了)
+            updateDynamicNormalization(sIdx);
+
+            // 2. 更新顶部的日期输入框 (UI反馈)
+            if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
+            if (globalAllDates[Math.min(eIdx, globalAllDates.length-1)]) {
+                document.getElementById('endDate').value = globalAllDates[Math.min(eIdx, globalAllDates.length-1)];
             }
         });
 
-        // 鼠标交互：高亮与锁定
-        myChart.getZr().on('click', function(params) {
-            if (!params.target) toggleLock(null);
-        });
-        myChart.on('click', function(params) {
-            if (params.componentType === 'series') toggleLock(params.seriesName);
-        });
-        myChart.on('mouseover', function(params) {
-            if (params.componentType === 'series') applyHighlight(params.seriesName);
-        });
-        myChart.on('mouseout', function(params) {
-            if (params.componentType === 'series') clearHighlight();
-        });
+        // 其他交互
+        myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
+        myChart.on('click', function(params) { if (params.componentType === 'series') toggleLock(params.seriesName); });
+        myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
+        myChart.on('mouseout', function(params) { if (params.componentType === 'series') clearHighlight(); });
     }
 
-    // 5. 辅助 UI 逻辑
+    // 5. 辅助逻辑
     function handleRankingInputChange() {
-        // 当用户手动修改输入框时，这是为了改变“谁上榜”，所以重新计算排名
-        calculateRankAndRender(false);
+        calculateRankAndRender(false); // 重新排名，但不强制重置 Zoom
     }
 
     function renderRankList(colors) {
@@ -404,7 +419,9 @@
         let html = '';
         currentRankedData.forEach((item, index) => {
             const color = colors[index % colors.length];
-            // 列表显示的涨跌幅，依然是基于“选股范围”的，保持排名逻辑一致性
+            // 列表显示的涨幅依然是“选定排名区间”的涨幅，还是显示当前“视窗”的涨幅？
+            // 按照惯例，列表是排名的结果，应该显示排名的依据（即输入框选定区间的涨幅）
+            // 如果想显示当前视窗的涨幅，需要重新计算 pct。这里保持排名区间的涨幅。
             const pctStr = (item.pct * 100).toFixed(2) + '%';
             const cls = item.pct >= 0 ? 'up' : 'down';
             
@@ -424,15 +441,14 @@
         container.innerHTML = html;
     }
 
-    // 高亮逻辑
+    // 高亮 Visuals
     function applyHighlight(targetName) {
         if (lockedSeries) return; 
         updateVisuals(targetName);
     }
-
     function clearHighlight() {
         if (lockedSeries) return;
-        // 恢复默认：所有都不变暗
+        // 恢复默认
         myChart.setOption({
             series: currentRankedData.map(() => ({
                 lineStyle: { opacity: 1, width: 2 },
@@ -443,7 +459,6 @@
             el.classList.remove('active-state', 'dimmed');
         });
     }
-
     function toggleLock(targetName) {
         if (lockedSeries === targetName || targetName === null) {
             lockedSeries = null;
@@ -453,22 +468,15 @@
             updateVisuals(targetName);
         }
     }
-
     function updateVisuals(targetName) {
-        // 图表：其他变暗
         const newStyles = currentRankedData.map(item => {
             const isTarget = item.name === targetName;
             return {
-                lineStyle: {
-                    opacity: isTarget ? 1 : 0.1, 
-                    width: isTarget ? 4 : 1
-                },
+                lineStyle: { opacity: isTarget ? 1 : 0.1, width: isTarget ? 4 : 1 },
                 z: isTarget ? 10 : 2
             };
         });
         myChart.setOption({ series: newStyles });
-
-        // 列表：其他变暗
         document.querySelectorAll('.list-item').forEach(el => {
             if (el.dataset.name === targetName) {
                 el.classList.add('active-state');
