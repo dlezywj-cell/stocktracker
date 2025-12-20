@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (动态排序+精准归一)</title>
+    <title>行业强弱追踪 (修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -69,11 +69,10 @@
         .list-body::-webkit-scrollbar { width: 4px; }
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
         
-        /* 增加 CSS 动画让列表重排更丝滑 */
         .list-item {
             padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; cursor: pointer; border-bottom: 1px solid transparent;
-            transition: background 0.2s, opacity 0.2s; 
+            transition: transform 0.2s, background 0.2s, opacity 0.2s; 
             opacity: 1;
         }
         .list-item:hover { background: #f9f9f9; }
@@ -133,7 +132,7 @@
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#999;font-size:10px;">(实时排序)</span>
+            <span style="font-weight:normal;color:#999;font-size:10px;">(动态排序)</span>
             <span>区间收益率</span>
         </div>
         <div class="list-body" id="rankList"></div>
@@ -147,9 +146,9 @@
     let currentRankedData = []; 
     let globalAllDates = [];
     
-    // 颜色池：固定颜色，防止排序变了颜色乱跳
+    // 颜色池
     const colorPalette = ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e'];
-    let industryColors = {}; // 存储 行业名 -> 颜色 的映射
+    let industryColors = {}; 
 
     function initDate() {
         const end = new Date();
@@ -209,17 +208,17 @@
             }
         });
 
-        // 初始排序，决定谁上榜（Top N）
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
-        // 分配固定颜色
+        // 分配颜色
         currentRankedData.forEach((item, index) => {
             if (!industryColors[item.name]) {
                 industryColors[item.name] = colorPalette[index % colorPalette.length];
             }
         });
 
+        // 初始渲染，传入范围
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
@@ -239,7 +238,6 @@
             data: item.fullData, 
             emphasis: { disabled: true },
             z: 2,
-            // 绑定固定颜色
             itemStyle: { color: industryColors[item.name] }
         }));
 
@@ -252,7 +250,7 @@
 
         const option = {
             animation: false, 
-            grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
+            grid: { left: '45', right: '20', bottom: '45', top: '30', containLabel: false },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
@@ -260,13 +258,15 @@
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
+                    // 按照数值从大到小排序 tooltip
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
-                        const dotOpacity = isDimmed ? '0.5' : '1';
+                        const dotOpacity = isDimmed ? '0.3' : '1';
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
+                        // 这里 p.value 已经是归一化后的值 (如 1.05)
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `<div style="color:${textColor}; font-weight:${fontWeight}">
                                     ${colorDot}${p.seriesName}: ${valStr}
@@ -314,76 +314,80 @@
         
         // 初始计算
         if (startIdx === null) {
-            startIdx = getPixelPerfectStartIndex();
+            const opt = myChart.getOption();
+            const sPct = opt.dataZoom[0].start;
+            startIdx = Math.floor(globalAllDates.length * sPct / 100);
         }
         if (endIdx === null) endIdx = globalAllDates.length;
 
-        updateDynamicNormalization(startIdx);
-        // 初始也要排序并渲染列表
-        recalcAndSortList(startIdx, endIdx);
+        // 立即执行归一化和排序
+        updateChartAndList(startIdx, endIdx);
     }
 
-    // 核心函数 1：获取像素级对齐的左边缘索引 (解决0点对齐问题)
-    function getPixelPerfectStartIndex() {
-        if (!myChart) return 0;
-        // 获取 Grid 区域的像素位置
-        const model = myChart.getModel();
-        const grid = model.getComponent('grid', 0);
-        const rect = grid.coordinateSystem.getRect();
-        
-        // 找到 Grid 最左侧 (X坐标) 对应的数据索引
-        // 这比 dataZoom 的百分比反推更精准，因为它对应了屏幕上的物理像素
-        const startIdx = myChart.convertFromPixel({seriesIndex: 0}, [rect.x, 0]);
-        
-        // convertFromPixel 返回的是索引，确保不越界
-        return Math.max(0, Math.min(startIdx, globalAllDates.length - 1));
-    }
+    // 核心函数：统一处理 归一化 + 列表重算 + 排序
+    function updateChartAndList(sIdx, eIdx) {
+        // 1. 安全边界处理
+        sIdx = Math.max(0, Math.min(sIdx, globalAllDates.length - 1));
+        // eIdx 在 slice 时不包含，但取数据时需要是有效索引，所以取 min
+        eIdx = Math.min(eIdx, globalAllDates.length); 
+        // 实际结束数据的索引
+        const actualEndIdx = Math.max(sIdx, eIdx - 1); 
 
-    // 核心函数 2：动态归一化
-    function updateDynamicNormalization(viewStartIdx) {
-        if (!currentRankedData.length) return;
-        viewStartIdx = Math.max(0, Math.min(viewStartIdx, globalAllDates.length - 1));
-
+        // 2. 动态归一化 (修复数字巨大问题)
         const newSeries = currentRankedData.map(item => {
-            let basePrice = item.fullData[viewStartIdx];
-            if (!basePrice) {
-                // 向后寻找最近的有效价格
-                for(let i=viewStartIdx; i<item.fullData.length; i++) {
-                    if(item.fullData[i]) { basePrice = item.fullData[i]; break; }
+            let basePrice = item.fullData[sIdx];
+            
+            // 严谨容错：防止分母为0或空
+            if (!basePrice || basePrice === 0) {
+                // 向后寻找最近的有效非0价格
+                for(let i = sIdx; i < item.fullData.length; i++) {
+                    if(item.fullData[i] && item.fullData[i] !== 0) { 
+                        basePrice = item.fullData[i]; 
+                        break; 
+                    }
                 }
             }
-            if (!basePrice) return item.fullData; 
-            return item.fullData.map(p => p ? parseFloat((p / basePrice).toFixed(4)) : null);
+            
+            // 如果整条线都没数据，返回空数组
+            if (!basePrice) return item.fullData.map(() => null);
+
+            return item.fullData.map(p => {
+                if (!p) return null;
+                // 结果：1.0000 起步
+                return parseFloat((p / basePrice).toFixed(4));
+            });
         });
-
+        
+        // 更新图表数据
         myChart.setOption({ series: newSeries.map(data => ({ data: data })) });
-    }
 
-    // 核心函数 3：动态重排列表 (解决排序联动问题)
-    function recalcAndSortList(sIdx, eIdx) {
-        sIdx = Math.max(0, sIdx);
-        eIdx = Math.min(eIdx, globalAllDates.length);
-        const actualEndIdx = Math.max(sIdx, eIdx - 1);
-
-        // 1. 计算当前视窗内的收益率
-        const dynamicData = currentRankedData.map(item => {
+        // 3. 计算区间收益率 并 重新排序
+        // 复制一份数据用于排序，不影响 currentRankedData 的原始顺序（用于 Series 对应）
+        // 但我们需要重新渲染列表，所以创建一个带临时收益率的对象数组
+        const sortedList = currentRankedData.map(item => {
             const startP = item.fullData[sIdx];
             const endP = item.fullData[actualEndIdx];
-            let currentPct = 0;
-            if (startP && endP) {
+            let currentPct = -999; // 默认极小值排最后
+
+            if (startP && endP && startP !== 0) {
                 currentPct = (endP - startP) / startP;
             }
             return {
-                ...item, // 复制原对象引用
-                currentPct: currentPct // 增加一个临时属性用于排序
+                name: item.name,
+                currentPct: currentPct
             };
         });
 
-        // 2. 根据当前收益率重新排序
-        dynamicData.sort((a, b) => b.currentPct - a.currentPct);
+        // 执行排序：从大到小
+        sortedList.sort((a, b) => b.currentPct - a.currentPct);
 
-        // 3. 重新渲染列表 (传入排序后的数据)
-        renderRankList(dynamicData);
+        // 4. 重新渲染右侧列表
+        renderRankList(sortedList);
+        
+        // 5. 保持高亮状态 (如果当前有锁定)
+        if (lockedSeries) {
+            updateVisuals(lockedSeries);
+        }
     }
 
     // 渲染列表 DOM
@@ -391,11 +395,16 @@
         const container = document.getElementById('rankList');
         let html = '';
         sortedData.forEach((item, index) => {
-            const color = industryColors[item.name]; // 使用固定颜色
-            const pctStr = (item.currentPct * 100).toFixed(2) + '%';
-            const cls = item.currentPct >= 0 ? 'up' : 'down';
+            const color = industryColors[item.name];
+            let pctStr = '--';
+            let cls = '';
             
-            // 判断锁定状态样式
+            if (item.currentPct !== -999) {
+                pctStr = (item.currentPct * 100).toFixed(2) + '%';
+                cls = item.currentPct >= 0 ? 'up' : 'down';
+            }
+
+            // 保持选中状态样式
             let itemClass = 'list-item';
             if (lockedSeries) {
                 if (lockedSeries === item.name) itemClass += ' active-state';
@@ -420,33 +429,30 @@
 
     function setupEvents() {
         myChart.on('dataZoom', function(params) {
-            // 使用 convertFromPixel 获取最精准的左边缘索引
-            // 这能解决 "差一天" 的问题
-            const sIdx = getPixelPerfectStartIndex();
-            
-            // 获取结束索引
+            // 使用百分比计算，修复之前像素转换的 BUG
             const opt = myChart.getOption();
+            const startPct = opt.dataZoom[0].start;
             const endPct = opt.dataZoom[0].end;
-            const eIdx = Math.ceil(globalAllDates.length * endPct / 100);
-
-            // 1. 图表归一化
-            updateDynamicNormalization(sIdx);
             
-            // 2. 列表重排与更新
-            recalcAndSortList(sIdx, eIdx);
+            const totalLen = globalAllDates.length;
+            // 确保索引有效
+            const sIdx = Math.floor(totalLen * startPct / 100);
+            const eIdx = Math.ceil(totalLen * endPct / 100);
 
-            // 3. 输入框更新
+            // 核心调用：归一化 + 排序 + 渲染列表
+            updateChartAndList(sIdx, eIdx);
+
+            // 更新输入框
             if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
-            const safeEndIdx = Math.min(eIdx - 1, globalAllDates.length - 1);
+            const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
             if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
         });
 
+        // 交互事件
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
-        
         myChart.on('click', function(params) { 
             if (params.componentType === 'series') toggleLock(params.seriesName); 
         });
-
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
         myChart.on('mouseout', function(params) { if (params.componentType === 'series') clearHighlight(); });
     }
@@ -476,7 +482,7 @@
     }
 
     function updateVisuals(targetName) {
-        // 图表样式更新
+        // 1. 图表样式
         const newStyles = currentRankedData.map(item => {
             const isTarget = targetName ? (item.name === targetName) : true;
             const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
@@ -489,17 +495,15 @@
         });
         myChart.setOption({ series: newStyles });
 
-        // 列表样式更新 (仅更新 class，不重绘 DOM 以保持性能)
-        const items = document.querySelectorAll('.list-item');
-        items.forEach(el => {
+        // 2. 列表样式
+        document.querySelectorAll('.list-item').forEach(el => {
             if (!targetName) {
                 el.classList.remove('active-state', 'dimmed');
             } else {
                 if (el.dataset.name === targetName) {
                     el.classList.add('active-state');
                     el.classList.remove('dimmed');
-                    // 可选：高亮时自动滚动
-                    // el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } else {
                     el.classList.remove('active-state');
                     el.classList.add('dimmed');
