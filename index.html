@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪</title>
-    <!-- 引入 ECharts -->
+    <title>行业强弱追踪 Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -16,120 +15,119 @@
             --primary: #007aff;
             --success: #34c759;
             --danger: #ff3b30;
-            --shadow-card: 0 4px 12px rgba(0,0,0,0.04);
-            --radius-l: 18px;
-            --radius-m: 12px;
+            --radius: 12px;
         }
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
             background: var(--bg); color: var(--text-main); margin: 0; 
-            min-height: 100vh; display: flex; flex-direction: column;
-            -webkit-font-smoothing: antialiased; 
-            overflow-x: hidden;
+            height: 100vh; /* 固定高度，禁止整个页面滚动 */
+            display: flex; flex-direction: column;
+            overflow: hidden; 
         }
 
+        /* 顶部导航 */
         header { 
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: saturate(180%) blur(20px); 
-            -webkit-backdrop-filter: saturate(180%) blur(20px);
-            height: 50px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: space-between; padding: 0 16px; 
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5;
+            height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
         }
-        .app-title { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px;}
-        .sync-info { font-size: 12px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; }
-        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .sync-dot.online { background: var(--success); box-shadow: 0 0 6px rgba(52, 199, 89, 0.4); }
-        .sync-dot.loading { background: var(--primary); animation: pulse 1s infinite; }
-        
+        .app-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+        .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
+        .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
+        .sync-dot.online { background: var(--success); }
+
+        /* 控制栏 */
         .control-panel {
-            background: var(--bg); padding: 15px 16px; flex-shrink: 0;
-            display: flex; flex-direction: column; gap: 12px;
+            background: var(--bg); padding: 10px 16px; flex-shrink: 0;
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
-
-        .input-group {
-            background: var(--card); padding: 12px; border-radius: var(--radius-m);
-            box-shadow: var(--shadow-card); display: flex; align-items: center; justify-content: space-between;
-        }
-        
-        .label-text { font-size: 13px; font-weight: 600; color: var(--text-sec); }
-        
+        .input-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sec); }
         .date-inp {
-            border: none; background: #f2f2f7; color: var(--primary);
-            padding: 6px 10px; border-radius: 8px; font-size: 13px; font-family: inherit; font-weight: 500;
-            outline: none; text-align: center; width: 110px;
+            border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
+            padding: 4px 8px; border-radius: 6px; font-size: 12px; font-family: inherit;
+            outline: none; text-align: center; width: 105px;
         }
-
-        .rank-inputs { display: flex; align-items: center; gap: 8px; }
         .num-inp {
-            border: none; background: #f2f2f7; color: var(--text-main);
-            padding: 6px; border-radius: 8px; font-size: 13px; font-weight: 600;
-            width: 40px; text-align: center; outline: none;
+            border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
+            width: 36px; text-align: center; font-size: 12px;
+        }
+        .btn-icon {
+            background: var(--primary); color: white; border: none; width: 28px; height: 28px;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        .main-content {
-            flex: 1; padding: 0 16px 20px 16px; display: flex; flex-direction: column;
+        /* --- 核心布局：左右分栏 --- */
+        .workspace {
+            flex: 1; display: flex; gap: 10px; padding: 10px;
+            overflow: hidden; /* 防止溢出 */
         }
-        
-        .chart-card {
-            background: var(--card); border-radius: var(--radius-l);
-            box-shadow: var(--shadow-card);
-            /* 关键修改：取消 flex:1，改为自动高度，依靠内部容器撑开 */
+
+        /* 左侧：图表区 */
+        .chart-wrapper {
+            flex: 1; background: var(--card); border-radius: var(--radius);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column;
             position: relative;
-            padding: 10px;
-            overflow: hidden;
-            margin-bottom: 20px;
+            min-width: 0; /* Flexbox 溢出保护 */
         }
+        #chart-container { width: 100%; height: 100%; }
 
-        /* 关键修改：强制指定高度，防止塌陷为 0 */
-        #chart-container { 
-            width: 100%; 
-            height: 60vh;       /* 占据屏幕高度的 60% */
-            min-height: 400px;  /* 最小高度 400px */
-        }
-
-        .loading-mask {
-            position: absolute; inset: 0; background: rgba(255,255,255,0.8);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 10; font-size: 14px; color: var(--text-sec);
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        }
-        .loading-mask.show { opacity: 1; pointer-events: auto; }
-
-        .ranking-list {
-            background: var(--card); border-radius: var(--radius-l);
-            box-shadow: var(--shadow-card); padding: 10px 0;
+        /* 右侧：列表区 */
+        .list-wrapper {
+            width: 260px; background: var(--card); border-radius: var(--radius);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column; flex-shrink: 0;
         }
         .list-header {
-            padding: 0 16px 8px 16px; font-size: 12px; color: var(--text-sec); border-bottom: 1px solid #f5f5f7;
-            display: flex; justify-content: space-between;
+            padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--text-sec);
+            border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between;
         }
+        .list-body {
+            flex: 1; overflow-y: auto; /* 列表内部滚动 */
+            padding: 4px 0;
+        }
+        /* 滚动条美化 */
+        .list-body::-webkit-scrollbar { width: 4px; }
+        .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
+
         .list-item {
-            padding: 12px 16px; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center;
-            font-size: 14px; cursor: pointer;
+            padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; cursor: pointer; border-bottom: 1px solid transparent;
+            transition: background 0.1s;
         }
-        .list-item:active { background-color: #f5f5f7; }
-        .list-item:last-child { border-bottom: none; }
-        .idx-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .idx-color { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .list-item:hover { background: #f9f9f9; }
+        .list-item.active-solo { background: #eef6ff; border-left: 3px solid var(--primary); }
+        .list-item.dimmed { opacity: 0.3; }
+
+        .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .idx-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;}
         .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
         .up { color: var(--danger); }
         .down { color: var(--success); }
 
-        .btn-refresh {
-            background: var(--primary); color: white; border: none;
-            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
-            box-shadow: 0 4px 10px rgba(0,122,255,0.3); cursor: pointer;
+        .loading-mask {
+            position: absolute; inset: 0; background: rgba(255,255,255,0.9);
+            display: flex; align-items: center; justify-content: center; z-index: 10;
+            font-size: 13px; color: var(--text-sec);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
         }
+        .loading-mask.show { opacity: 1; pointer-events: auto; }
 
+        /* --- 响应式：手机端变回上下布局 --- */
+        @media (max-width: 768px) {
+            body { height: auto; overflow-y: auto; }
+            .workspace { flex-direction: column; height: auto; padding: 0; gap: 0; }
+            .chart-wrapper { height: 60vh; min-height: 350px; border-radius: 0; }
+            .list-wrapper { width: 100%; height: auto; border-radius: 0; box-shadow: none; border-top: 1px solid #eee;}
+            .list-body { max-height: 400px; } /* 手机端列表限高 */
+        }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="app-title"><i class="fas fa-chart-line" style="color:var(--primary)"></i> 行业强弱追踪</div>
+    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪</div>
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
@@ -138,40 +136,44 @@
 
 <div class="control-panel">
     <div class="input-group">
-        <span class="label-text">时间范围</span>
-        <div style="display:flex; gap:5px; align-items:center;">
-            <input type="date" id="startDate" class="date-inp" onchange="renderChart()">
-            <span style="color:#ccc">-</span>
-            <input type="date" id="endDate" class="date-inp" onchange="renderChart()">
-        </div>
+        <span>区间:</span>
+        <input type="date" id="startDate" class="date-inp" onchange="renderChart()">
+        <span>-</span>
+        <input type="date" id="endDate" class="date-inp" onchange="renderChart()">
     </div>
-    
-    <div class="input-group">
-        <span class="label-text">涨幅排名 (前N名)</span>
-        <div class="rank-inputs">
-            <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="renderChart()">
-            <span style="color:#ccc">至</span>
-            <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="renderChart()">
-            <button class="btn-refresh" onclick="fetchData()"><i class="fas fa-sync-alt"></i></button>
-        </div>
+    <div class="input-group" style="margin-left: auto;">
+        <span>排名:</span>
+        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="renderChart()">
+        <span>-</span>
+        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="renderChart()">
+        <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
     </div>
 </div>
 
-<div class="main-content">
-    <div class="chart-card">
+<div class="workspace">
+    <!-- 左侧图表 -->
+    <div class="chart-wrapper">
         <div class="loading-mask" id="loader">
-            <i class="fas fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; color:var(--primary)"></i>
-            <span>正在读取数据...</span>
+            <span><i class="fas fa-spinner fa-spin"></i> 数据加载中...</span>
         </div>
         <div id="chart-container"></div>
     </div>
 
-    <div class="ranking-list" id="rankList"></div>
+    <!-- 右侧列表 -->
+    <div class="list-wrapper">
+        <div class="list-header">
+            <span>行业名称</span>
+            <span style="font-weight:normal;color:#999;font-size:10px;">(双击单显)</span>
+            <span>累计涨幅</span>
+        </div>
+        <div class="list-body" id="rankList"></div>
+    </div>
 </div>
 
 <script>
     let rawData = null; 
     let myChart = null;
+    let soloSeriesName = null; // 当前是否处于“单显模式”
 
     function initDate() {
         const end = new Date();
@@ -193,7 +195,6 @@
         try {
             const response = await fetch('industry_data.json?t=' + Date.now());
             if (!response.ok) throw new Error("Status: " + response.status);
-            
             rawData = await response.json();
             
             dot.className = 'sync-dot online';
@@ -205,8 +206,6 @@
             dot.className = 'sync-dot';
             dot.style.background = 'var(--danger)';
             timeTxt.innerText = '失败';
-            // 如果是在本地测试，可能会因为跨域报错
-            if(window.location.protocol === 'file:') alert("请部署到 GitHub Pages 后查看");
         } finally {
             loader.classList.remove('show');
         }
@@ -214,35 +213,19 @@
 
     function renderChart() {
         if (!rawData) return;
-        
+        soloSeriesName = null; // 重绘时重置单显模式
+
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
         const nStart = parseInt(document.getElementById('rankStart').value);
         const nEnd = parseInt(document.getElementById('rankEnd').value);
 
         const allDates = rawData.dates;
-        
-        // --- 索引查找逻辑优化 ---
         let sIdx = allDates.findIndex(d => d >= sDate);
-        if (sIdx === -1) {
-             // 如果找不到比开始日期大的，说明开始日期可能在未来，或者已经是最后一天
-             if (sDate > allDates[allDates.length-1]) {
-                 // 开始时间太晚了
-                 sIdx = allDates.length - 1; 
-             } else {
-                 // 开始时间太早了
-                 sIdx = 0;
-             }
-        }
-        
+        if (sIdx === -1) sIdx = (sDate > allDates[allDates.length-1]) ? allDates.length-1 : 0;
         let eIdx = allDates.findIndex(d => d > eDate);
         if (eIdx === -1) eIdx = allDates.length;
-
-        // 避免 slice 错误
-        if (sIdx >= eIdx) {
-            // 尝试回退
-            sIdx = Math.max(0, eIdx - 20);
-        }
+        if (sIdx >= eIdx) sIdx = Math.max(0, eIdx - 20);
 
         const slicedDates = allDates.slice(sIdx, eIdx);
         let rankings = [];
@@ -251,95 +234,163 @@
         industryNames.forEach(name => {
             const prices = rawData.data[name];
             if (!prices) return;
-
-            // 确保切片安全
             const subset = prices.slice(sIdx, eIdx);
-            
-            // 如果数据点少于2个，ECharts 画线可能看不见，跳过
             if (subset.length < 1) return;
-
             const basePrice = subset[0];
             if (!basePrice) return;
 
             const normalized = subset.map(p => parseFloat((p / basePrice).toFixed(4)));
             const pct = normalized[normalized.length - 1] - 1.0;
-
             rankings.push({ name: name, pct: pct, data: normalized });
         });
 
-        // 排序并截取
         rankings.sort((a, b) => b.pct - a.pct);
         const targetData = rankings.slice(nStart - 1, nEnd);
 
-        // 生成配置
+        // 生成图表数据
         const series = targetData.map(item => ({
             name: item.name,
             type: 'line',
             smooth: true,
-            showSymbol: false, // 不显示小圆点，保持线条流畅
+            showSymbol: false, 
+            // 关键：线宽加粗一点点方便鼠标悬停
+            lineStyle: { width: 2 },
             data: item.data,
-            emphasis: { focus: 'series' }
+            emphasis: { 
+                focus: 'self', // 悬停时只高亮自己
+                lineStyle: { width: 4 } 
+            }
         }));
 
-        if (!myChart) myChart = echarts.init(document.getElementById('chart-container'));
+        if (!myChart) {
+            myChart = echarts.init(document.getElementById('chart-container'));
+            // 绑定图表的双击事件
+            myChart.on('dblclick', function (params) {
+                if (params.componentType === 'series') {
+                    toggleSoloMode(params.seriesName);
+                }
+            });
+            // 点击空白处取消单显
+            myChart.getZr().on('click', function (params) {
+                if (!params.target) {
+                    toggleSoloMode(null);
+                }
+            });
+        }
 
         const option = {
+            // 关键修改：Tooltip 触发模式改为 'item'
             tooltip: {
-                trigger: 'axis',
-                confine: true,
+                trigger: 'item', // 只有鼠标碰到线才显示
                 formatter: function(params) {
-                    let res = params[0].axisValue + '<br/>';
-                    params.sort((a,b) => b.value - a.value);
-                    params.forEach(item => {
-                        const change = ((item.value - 1) * 100).toFixed(2) + '%';
-                        const colorStr = item.value >= 1 ? '#ff3b30' : '#34c759';
-                        res += `<div style="display:flex;justify-content:space-between;min-width:160px;font-size:12px;">
-                                <span><span style="display:inline-block;margin-right:4px;border-radius:10px;width:8px;height:8px;background-color:${item.color};"></span>${item.seriesName}</span>
-                                <span style="font-weight:bold;color:${colorStr}">${change}</span>
-                                </div>`;
-                    });
-                    return res;
+                    const date = params.name; // x轴是类目轴，name就是日期
+                    const val = params.value;
+                    const change = ((val - 1) * 100).toFixed(2) + '%';
+                    const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${params.color};"></span>`;
+                    return `${date}<br/>${colorDot}<b>${params.seriesName}</b><br/>净值: ${val}<br/>涨跌: ${change}`;
                 }
             },
-            grid: { left: '2%', right: '5%', bottom: '3%', top: '12%', containLabel: true },
+            grid: { left: '40', right: '20', bottom: '30', top: '30', containLabel: false },
             xAxis: {
                 type: 'category', boundaryGap: false, data: slicedDates,
-                axisLine: { lineStyle: { color: '#e5e5ea' } },
-                axisLabel: { color: '#8e8e93', fontSize: 10 }
+                axisLine: { lineStyle: { color: '#eee' } },
+                axisLabel: { color: '#999', fontSize: 10 }
             },
             yAxis: {
                 type: 'value', scale: true,
                 splitLine: { lineStyle: { color: '#f5f5f7' } },
-                axisLabel: { formatter: (val) => val.toFixed(2), fontSize: 10 }
+                axisLabel: { 
+                    color: '#999', fontSize: 10,
+                    formatter: (val) => ((val-1)*100).toFixed(0) + '%' // Y轴直接显示百分比
+                }
             },
             series: series,
-            color: ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#8e8e93', '#34c759']
+            // 预设一组好看的颜色
+            color: ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e']
         };
 
-        myChart.setOption(option, true);
+        myChart.setOption(option, true); // true = 不合并，彻底重绘
         renderRankList(targetData, option.color);
     }
 
     function renderRankList(data, colors) {
         const container = document.getElementById('rankList');
-        let html = `<div class="list-header"><span>行业 (${data.length}个)</span><span>区间涨跌</span></div>`;
+        let html = '';
         data.forEach((item, index) => {
             const color = colors[index % colors.length];
             const pctStr = (item.pct * 100).toFixed(2) + '%';
             const cls = item.pct >= 0 ? 'up' : 'down';
+            
+            // 列表项双击事件绑定
             html += `
-            <div class="list-item" onclick="highlightSeries('${item.name}')">
-                <div class="idx-name"><span class="idx-color" style="background:${color}"></span>${index + 1}. ${item.name}</div>
+            <div class="list-item" id="item-${item.name}" 
+                 onclick="highlightSeries('${item.name}')" 
+                 ondblclick="toggleSoloMode('${item.name}')">
+                <div class="idx-name">
+                    <div class="idx-dot" style="background:${color}"></div>
+                    ${index + 1}. ${item.name}
+                </div>
                 <div class="idx-val ${cls}">${item.pct >= 0 ? '+' : ''}${pctStr}</div>
             </div>`;
         });
         container.innerHTML = html;
     }
 
+    // --- 交互逻辑 ---
+
+    // 1. 鼠标悬停高亮（临时）
     function highlightSeries(name) {
-        if(!myChart) return;
+        if(soloSeriesName) return; // 如果在单显模式，禁止普通高亮干扰
         myChart.dispatchAction({ type: 'highlight', seriesName: name });
-        setTimeout(() => myChart.dispatchAction({ type: 'downplay', seriesName: name }), 1500);
+        setTimeout(() => {
+             // 只有当没有进入单显模式时，才取消高亮
+            if(!soloSeriesName) myChart.dispatchAction({ type: 'downplay', seriesName: name });
+        }, 1000);
+    }
+
+    // 2. 双击单显模式 (Solo Mode)
+    function toggleSoloMode(targetName) {
+        // 如果点击的是当前已经Solo的，或者传null，则取消Solo
+        if (soloSeriesName === targetName || targetName === null) {
+            soloSeriesName = null;
+            // 恢复所有线条选中状态
+            myChart.dispatchAction({ type: 'legendAllSelect' });
+            // 恢复列表样式
+            document.querySelectorAll('.list-item').forEach(el => {
+                el.classList.remove('dimmed', 'active-solo');
+            });
+        } else {
+            // 进入Solo模式
+            soloSeriesName = targetName;
+            
+            // ECharts 技巧：利用 legendInverseSelect 实现“反选”
+            // 但因为我们隐藏了 Legend 组件，这里通过 dispatchAction 批量操作
+            // 最简单的方法：先全不选，再选目标
+            // 注意：echarts 的 legendSelect 需要 series 有 name
+            
+            // 1. 获取所有 series name
+            const allNames = myChart.getOption().series.map(s => s.name);
+            
+            // 2. 构造 action 列表
+            // 这里为了性能，我们不用循环 dispatch，而是用 legendSelected map
+            const selectedMap = {};
+            allNames.forEach(n => {
+                selectedMap[n] = (n === targetName);
+            });
+
+            myChart.setOption({ legend: { selected: selectedMap } });
+
+            // 3. 更新列表样式
+            document.querySelectorAll('.list-item').forEach(el => {
+                if(el.id === `item-${targetName}`) {
+                    el.classList.remove('dimmed');
+                    el.classList.add('active-solo');
+                } else {
+                    el.classList.add('dimmed');
+                    el.classList.remove('active-solo');
+                }
+            });
+        }
     }
 
     window.addEventListener('resize', () => myChart && myChart.resize());
