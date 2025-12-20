@@ -2,360 +2,189 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行业强弱追踪(调试模式)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --bg: #f5f5f7;
-            --card: #ffffff;
-            --text-main: #1d1d1f;
-            --text-sec: #86868b;
-            --primary: #007aff;
-            --success: #34c759;
-            --danger: #ff3b30;
-            --shadow-card: 0 4px 12px rgba(0,0,0,0.04);
-            --radius-l: 18px;
-            --radius-m: 12px;
+        body { font-family: sans-serif; background: #f5f5f7; margin: 0; padding: 10px; }
+        .card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        #debug-log { 
+            background: #333; color: #0f0; font-family: monospace; 
+            padding: 10px; border-radius: 8px; font-size: 12px; 
+            height: 200px; overflow-y: scroll; white-space: pre-wrap;
+            margin-bottom: 10px;
         }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
-            background: var(--bg); color: var(--text-main); margin: 0; 
-            min-height: 100vh; display: flex; flex-direction: column;
-            -webkit-font-smoothing: antialiased; 
-            overflow-x: hidden;
-        }
-
-        header { 
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: saturate(180%) blur(20px); 
-            -webkit-backdrop-filter: saturate(180%) blur(20px);
-            height: 50px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: space-between; padding: 0 16px; 
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            position: sticky; top: 0; z-index: 100;
-        }
-        .app-title { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px;}
-        .sync-info { font-size: 12px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; }
-        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .sync-dot.online { background: var(--success); box-shadow: 0 0 6px rgba(52, 199, 89, 0.4); }
-        .sync-dot.loading { background: var(--primary); animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-        .control-panel {
-            background: var(--bg); padding: 15px 16px; flex-shrink: 0;
-            display: flex; flex-direction: column; gap: 12px;
-        }
-
-        .input-group {
-            background: var(--card); padding: 12px; border-radius: var(--radius-m);
-            box-shadow: var(--shadow-card); display: flex; align-items: center; justify-content: space-between;
-        }
-        
-        .label-text { font-size: 13px; font-weight: 600; color: var(--text-sec); }
-        
-        .date-inp {
-            border: none; background: #f2f2f7; color: var(--primary);
-            padding: 6px 10px; border-radius: 8px; font-size: 13px; font-family: inherit; font-weight: 500;
-            outline: none; text-align: center; width: 110px;
-        }
-
-        .rank-inputs { display: flex; align-items: center; gap: 8px; }
-        .num-inp {
-            border: none; background: #f2f2f7; color: var(--text-main);
-            padding: 6px; border-radius: 8px; font-size: 13px; font-weight: 600;
-            width: 40px; text-align: center; outline: none;
-        }
-
-        .main-content {
-            flex: 1; padding: 0 16px 20px 16px; display: flex; flex-direction: column;
-        }
-        
-        .chart-card {
-            background: var(--card); border-radius: var(--radius-l);
-            box-shadow: var(--shadow-card);
-            flex: 1; min-height: 400px; position: relative;
-            padding: 10px;
-            overflow: hidden;
-        }
-
-        #chart-container { width: 100%; height: 100%; }
-
-        .loading-mask {
-            position: absolute; inset: 0; background: rgba(255,255,255,0.8);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 10; font-size: 14px; color: var(--text-sec);
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        }
-        .loading-mask.show { opacity: 1; pointer-events: auto; }
-
-        .ranking-list {
-            margin-top: 15px;
-            background: var(--card); border-radius: var(--radius-l);
-            box-shadow: var(--shadow-card); padding: 10px 0;
-        }
-        .list-header {
-            padding: 0 16px 8px 16px; font-size: 12px; color: var(--text-sec); border-bottom: 1px solid #f5f5f7;
-            display: flex; justify-content: space-between;
-        }
-        .list-item {
-            padding: 12px 16px; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center;
-            font-size: 14px;
-        }
-        .list-item:last-child { border-bottom: none; }
-        .idx-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .idx-color { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-        .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
-        .up { color: var(--danger); }
-        .down { color: var(--success); }
-
-        .btn-refresh {
-            background: var(--primary); color: white; border: none;
-            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
-            box-shadow: 0 4px 10px rgba(0,122,255,0.3); cursor: pointer;
-        }
-        .btn-refresh:active { transform: scale(0.96); }
-
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+        #chart-container { height: 400px; width: 100%; border: 1px dashed #ddd; }
+        h3 { margin-top: 0; }
     </style>
 </head>
 <body>
 
-<header>
-    <div class="app-title"><i class="fas fa-chart-line" style="color:var(--primary)"></i> 行业强弱追踪</div>
-    <div class="sync-info">
-        <div id="syncDot" class="sync-dot"></div>
-        <span id="updateTime">连接中...</span>
-    </div>
-</header>
+<div class="card">
+    <h3>调试日志 (请截图这里)</h3>
+    <div id="debug-log">等待加载...</div>
+    <button onclick="fetchData()" style="padding:8px 16px;background:#007aff;color:white;border:none;border-radius:6px;">手动刷新数据</button>
+</div>
 
-<div class="control-panel">
-    <div class="input-group">
-        <span class="label-text">时间范围</span>
-        <div style="display:flex; gap:5px; align-items:center;">
-            <input type="date" id="startDate" class="date-inp" onchange="renderChart()">
-            <span style="color:#ccc">-</span>
-            <input type="date" id="endDate" class="date-inp" onchange="renderChart()">
-        </div>
-    </div>
-    
-    <div class="input-group">
-        <span class="label-text">涨幅排名 (前N名)</span>
-        <div class="rank-inputs">
-            <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="renderChart()">
-            <span style="color:#ccc">至</span>
-            <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="renderChart()">
-            <button class="btn-refresh" onclick="fetchData()"><i class="fas fa-sync-alt"></i></button>
-        </div>
+<div class="card">
+    <div class="controls">
+        <input type="date" id="startDate" onchange="renderChart()">
+        <span>至</span>
+        <input type="date" id="endDate" onchange="renderChart()">
+        <button onclick="renderChart()">重绘</button>
     </div>
 </div>
 
-<div class="main-content">
-    <div class="chart-card">
-        <div class="loading-mask" id="loader">
-            <i class="fas fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; color:var(--primary)"></i>
-            <span>正在计算...</span>
-        </div>
-        <div id="chart-container"></div>
-    </div>
-
-    <div class="ranking-list" id="rankList">
-        <!-- 列表 -->
-    </div>
+<div class="card">
+    <div id="chart-container"></div>
 </div>
 
 <script>
+    // 简单的日志工具，把信息打印在屏幕上
+    function log(msg, isError = false) {
+        const box = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.style.color = isError ? '#ff4d4f' : '#0f0';
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        box.appendChild(line);
+        box.scrollTop = box.scrollHeight;
+        console.log(msg);
+    }
+
     let rawData = null; 
     let myChart = null;
 
-    function initDate() {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - 20); // 默认显示最近20天
-        
-        document.getElementById('endDate').valueAsDate = end;
-        document.getElementById('startDate').valueAsDate = start;
-    }
+    // 初始化日期
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 30);
+    document.getElementById('endDate').valueAsDate = end;
+    document.getElementById('startDate').valueAsDate = start;
 
     async function fetchData() {
-        const loader = document.getElementById('loader');
-        const dot = document.getElementById('syncDot');
-        const timeTxt = document.getElementById('updateTime');
+        log("开始请求 industry_data.json...");
         
-        loader.classList.add('show');
-        dot.className = 'sync-dot loading';
-        timeTxt.innerText = '更新中';
-
         try {
+            // 加上时间戳防止缓存
             const response = await fetch('industry_data.json?t=' + new Date().getTime());
-            if (!response.ok) throw new Error("无法加载数据");
             
-            rawData = await response.json();
+            log(`网络状态码: ${response.status}`);
             
-            dot.className = 'sync-dot online';
-            timeTxt.innerText = '更新于: ' + (rawData.last_update || '未知').split(' ')[1];
+            if (!response.ok) {
+                throw new Error(`文件请求失败 (404/403/500)`);
+            }
             
+            const text = await response.text();
+            log(`文件长度: ${text.length} 字符`);
+            
+            if (text.length < 50) {
+                log(`警告：文件内容太短: ${text}`, true);
+                throw new Error("数据文件看起来是空的或内容不对");
+            }
+
+            try {
+                rawData = JSON.parse(text);
+                log("JSON 解析成功！");
+            } catch (e) {
+                throw new Error("JSON 格式错误，无法解析");
+            }
+
+            // 检查数据结构
+            if (!rawData.dates || !Array.isArray(rawData.dates)) {
+                throw new Error("数据缺少 dates 字段或格式不对");
+            }
+            log(`包含日期数: ${rawData.dates.length} 天`);
+            log(`数据日期示例: ${rawData.dates[0]} ~ ${rawData.dates[rawData.dates.length-1]}`);
+            
+            if (!rawData.data) throw new Error("数据缺少 data 字段");
+            const keys = Object.keys(rawData.data);
+            log(`包含行业数: ${keys.length} 个`);
+            log(`行业示例: ${keys[0]}, 数据点: ${rawData.data[keys[0]].length}`);
+
             renderChart();
             
         } catch (error) {
-            console.error(error);
-            dot.className = 'sync-dot';
-            dot.style.background = 'var(--danger)';
-            timeTxt.innerText = '错误';
-        } finally {
-            loader.classList.remove('show');
+            log(`致命错误: ${error.message}`, true);
         }
     }
 
-    // ====================================================
-    // 核心逻辑：完全对应你的 Python 代码
-    // ====================================================
     function renderChart() {
-        if (!rawData) return;
-        
-        // 1. 获取用户选择的日期范围
-        const sDate = document.getElementById('startDate').value;
-        const eDate = document.getElementById('endDate').value;
-        const nStart = parseInt(document.getElementById('rankStart').value);
-        const nEnd = parseInt(document.getElementById('rankEnd').value);
+        if (!rawData) {
+            log("没有数据，无法绘图", true);
+            return;
+        }
 
-        // 2. 切片 (Data Slicing) - 对应 Python: df.loc[start:end]
-        const allDates = rawData.dates;
-        let sIdx = allDates.findIndex(d => d >= sDate);
-        let eIdx = allDates.findIndex(d => d > eDate);
-        
-        if (sIdx === -1) sIdx = 0;
-        if (eIdx === -1) eIdx = allDates.length;
-        
-        // 实际用来画图的日期轴
-        const slicedDates = allDates.slice(sIdx, eIdx);
-        
-        if (slicedDates.length === 0) { return; }
+        try {
+            const sDate = document.getElementById('startDate').value;
+            const eDate = document.getElementById('endDate').value;
+            log(`尝试绘图区间: ${sDate} 到 ${eDate}`);
 
-        let rankings = [];
-        const industryNames = Object.keys(rawData.data);
-
-        industryNames.forEach(name => {
-            const fullPrices = rawData.data[name];
-            if (!fullPrices || fullPrices.length < eIdx) return;
-
-            // 获取该时间段内的价格数组
-            const slicedPrices = fullPrices.slice(sIdx, eIdx);
+            // 查找索引
+            let sIdx = rawData.dates.findIndex(d => d >= sDate);
+            // 如果找不到（比如选的太早），就从0开始
+            if (sIdx === -1 && rawData.dates[0] > sDate) sIdx = 0;
             
-            // 3. 获取起点价格 (Base Price) - 对应 Python: shouri = df.iloc[0, :]
-            const basePrice = slicedPrices[0];
-            const endPrice = slicedPrices[slicedPrices.length - 1];
+            let eIdx = rawData.dates.findIndex(d => d > eDate);
+            if (eIdx === -1) eIdx = rawData.dates.length;
 
-            // 4. 计算涨幅并归一化 - 对应 Python: returns = ... 和 jingzhi = df / shouri
-            if (basePrice && endPrice) {
-                // 计算区间涨幅用于排序
-                const pct = (endPrice - basePrice) / basePrice;
-                
-                // 计算每天的净值 (归一化到起点=1.0)
-                // 对应 Python: jingzhi = df / shouri
-                const normalizedData = slicedPrices.map(p => parseFloat((p / basePrice).toFixed(4)));
+            log(`计算出的索引: Start=${sIdx}, End=${eIdx}`);
 
-                rankings.push({ 
-                    name: name, 
-                    pct: pct, 
-                    data: normalizedData,
-                    lastValue: normalizedData[normalizedData.length-1] 
-                });
+            if (sIdx >= eIdx) {
+                log("警告: 选定的时间内没有数据点 (Start >= End)", true);
+                return;
             }
-        });
 
-        // 5. 排序 (Sorting) - 对应 Python: sort_values
-        rankings.sort((a, b) => b.pct - a.pct);
-
-        // 6. 截取前 N 名 (Top N) - 对应 Python: .iloc[n_start:n_end]
-        const targetData = rankings.slice(nStart - 1, nEnd);
-
-        // 7. 生成图表配置
-        const series = targetData.map(item => {
-            return {
-                name: item.name,
-                type: 'line',
-                smooth: true,
-                symbol: 'none',
-                data: item.data, // 这里装的是已经归一化的净值
-                emphasis: { focus: 'series' }
-            };
-        });
-
-        if (!myChart) myChart = echarts.init(document.getElementById('chart-container'));
-
-        const option = {
-            tooltip: {
-                trigger: 'axis',
-                formatter: function(params) {
-                    let res = params[0].axisValue + '<br/>';
-                    params.sort((a,b) => b.value - a.value);
-                    params.forEach(item => {
-                        // 显示净值和相对于起点的涨跌幅
-                        const change = ((item.value - 1) * 100).toFixed(2) + '%';
-                        const colorStr = item.value >= 1 ? '#ff3b30' : '#34c759';
-                        res += `<div style="display:flex;justify-content:space-between;min-width:160px;">
-                                <span><span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>${item.seriesName}</span>
-                                <span style="font-weight:bold;color:${colorStr}">${change}</span>
-                                </div>`;
-                    });
-                    return res;
-                },
-                confine: true
-            },
-            grid: { left: '2%', right: '4%', bottom: '3%', top: '12%', containLabel: true },
-            xAxis: {
-                type: 'category', boundaryGap: false, data: slicedDates,
-                axisLine: { lineStyle: { color: '#e5e5ea' } },
-                axisLabel: { color: '#8e8e93', fontSize: 11 }
-            },
-            yAxis: {
-                type: 'value', scale: true,
-                splitLine: { lineStyle: { color: '#f5f5f7' } },
-                axisLabel: { formatter: (val) => val.toFixed(2) } // Y轴显示净值 (如 1.05)
-            },
-            series: series,
-            color: ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55']
-        };
-
-        myChart.setOption(option, true);
-        renderRankList(targetData, option.color);
-    }
-
-    function renderRankList(data, colors) {
-        const container = document.getElementById('rankList');
-        let html = `<div class="list-header"><span>行业 (${data.length}个)</span><span>区间涨跌</span></div>`;
-        
-        data.forEach((item, index) => {
-            const color = colors[index % colors.length];
-            const pctStr = (item.pct * 100).toFixed(2) + '%';
-            const cls = item.pct >= 0 ? 'up' : 'down';
+            // 准备数据
+            const series = [];
+            const slicedDates = rawData.dates.slice(sIdx, eIdx);
             
-            html += `
-            <div class="list-item" onclick="highlightSeries('${item.name}')">
-                <div class="idx-name">
-                    <span class="idx-color" style="background:${color}"></span>
-                    ${index + 1}. ${item.name}
-                </div>
-                <div class="idx-val ${cls}">${item.pct >= 0 ? '+' : ''}${pctStr}</div>
-            </div>`;
-        });
-        container.innerHTML = html;
+            // 简单的取前10个行业画图测试
+            const keys = Object.keys(rawData.data).slice(0, 10);
+            
+            keys.forEach(name => {
+                const prices = rawData.data[name];
+                if(prices && prices.length > sIdx) {
+                    const subset = prices.slice(sIdx, eIdx);
+                    // 归一化
+                    const base = subset[0];
+                    if(base) {
+                        const norm = subset.map(p => (p/base).toFixed(4));
+                        series.push({
+                            name: name,
+                            type: 'line',
+                            data: norm,
+                            showSymbol: false
+                        });
+                    }
+                }
+            });
+
+            log(`生成了 ${series.length} 条曲线数据`);
+
+            if (!myChart) myChart = echarts.init(document.getElementById('chart-container'));
+            
+            const option = {
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: slicedDates },
+                yAxis: { type: 'value', scale:true },
+                series: series
+            };
+            
+            myChart.setOption(option, true);
+            log("图表绘制命令已发送");
+
+        } catch (e) {
+            log(`绘图过程报错: ${e.message}`, true);
+            console.error(e);
+        }
     }
 
-    function highlightSeries(name) {
-        myChart.dispatchAction({ type: 'highlight', seriesName: name });
-        setTimeout(() => {
-            myChart.dispatchAction({ type: 'downplay', seriesName: name });
-        }, 1000);
-    }
+    // 启动
+    fetchData();
 
-    window.addEventListener('resize', () => { if(myChart) myChart.resize(); });
-
-    initDate();
-    fetchData(); 
-
+    window.addEventListener('resize', () => myChart && myChart.resize());
 </script>
 </body>
 </html>
