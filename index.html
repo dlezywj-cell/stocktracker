@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 Ultimate</title>
+    <title>行业强弱追踪 (动态归一化版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -93,10 +93,7 @@
         }
         .list-item:hover { background: #f9f9f9; }
         
-        /* 交互状态样式 */
-        /* 高亮状态：包括悬停和锁定 */
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
-        /* 变暗状态：其他非高亮项 */
         .list-item.dimmed { opacity: 0.2; filter: grayscale(100%); }
         
         .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
@@ -124,7 +121,7 @@
 <body>
 
 <header>
-    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪 Ultimate</div>
+    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪 Pro</div>
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
@@ -133,17 +130,16 @@
 
 <div class="control-panel">
     <div class="input-group">
-        <span>区间:</span>
-        <!-- 这两个输入框现在主要用于重新计算排名，图表缩放可以超出这个范围 -->
-        <input type="date" id="startDate" class="date-inp" onchange="handleInputDateChange()">
+        <span>选股范围:</span>
+        <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
         <span>-</span>
-        <input type="date" id="endDate" class="date-inp" onchange="handleInputDateChange()">
+        <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
     </div>
     <div class="input-group" style="margin-left: auto;">
         <span>排名:</span>
-        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleInputDateChange()">
+        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
         <span>-</span>
-        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleInputDateChange()">
+        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
         <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
     </div>
 </div>
@@ -156,8 +152,8 @@
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#999;font-size:10px;">(拖动图表缩放)</span>
-            <span>累计涨幅</span>
+            <span style="font-weight:normal;color:#999;font-size:10px;">(拖动滑块缩放)</span>
+            <span>区间涨幅</span>
         </div>
         <div class="list-body" id="rankList"></div>
     </div>
@@ -166,11 +162,9 @@
 <script>
     let rawData = null; 
     let myChart = null;
-    // 状态管理
-    let lockedSeries = null; // 当前被点击锁定的系列
-    let currentRankedData = []; // 当前计算好排名的完整数据
+    let lockedSeries = null;
+    let currentRankedData = []; 
     
-    // 初始化
     function initDate() {
         const end = new Date();
         const start = new Date();
@@ -193,7 +187,8 @@
             dot.className = 'sync-dot online';
             timeTxt.innerText = (rawData.last_update || '未知').split(' ')[0];
             
-            calculateRankAndRender(true); // true = 首次加载，自动缩放到选定区间
+            // 首次加载，计算排名并初始化图表
+            calculateRankAndRender(true); 
         } catch (error) {
             console.error(error);
             dot.className = 'sync-dot';
@@ -204,11 +199,10 @@
         }
     }
 
-    // 步骤1：根据输入的日期范围，计算排名，确定要显示哪几条线
-    // 注意：这一步只决定“谁在榜单上”，不决定图表的缩放
-    function calculateRankAndRender(autoZoom = false) {
+    // 1. 计算排名逻辑 (决定谁上榜)
+    function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
-        lockedSeries = null; // 重置锁定
+        lockedSeries = null;
 
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
@@ -216,74 +210,68 @@
         const nEnd = parseInt(document.getElementById('rankEnd').value);
         const allDates = rawData.dates;
 
-        // 寻找计算排名的区间索引
+        // 索引查找
         let sIdx = allDates.findIndex(d => d >= sDate);
-        if (sIdx === -1) sIdx = (sDate > allDates[allDates.length-1]) ? allDates.length-1 : 0;
+        if (sIdx === -1) sIdx = 0;
         let eIdx = allDates.findIndex(d => d > eDate);
         if (eIdx === -1) eIdx = allDates.length;
 
-        // 计算所有行业的区间涨幅
+        // 计算区间涨幅用于排名
         let tempRank = [];
-        const industryNames = Object.keys(rawData.data);
-
-        industryNames.forEach(name => {
+        Object.keys(rawData.data).forEach(name => {
             const prices = rawData.data[name];
-            if (!prices) return;
-            // 只有在计算排名的区间内有数据的才参与
-            if (prices.length <= sIdx) return;
+            if (!prices || prices.length <= sIdx) return;
             
             const startPrice = prices[sIdx];
             const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
             
             if (startPrice && endPrice) {
                 const pct = (endPrice - startPrice) / startPrice;
-                // 保存全量历史数据，供图表缩放使用
-                tempRank.push({ name: name, pct: pct, fullData: prices });
+                // 保存原始价格数据 (Raw Prices)，而不是归一化后的数据
+                // 因为归一化要根据缩放动态计算
+                tempRank.push({ name: name, pct: pct, rawData: prices });
             }
         });
 
-        // 排序并截取
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
 
-        // 渲染图表
-        initChartInstance(allDates, autoZoom ? sIdx : null, autoZoom ? eIdx : null);
+        // 如果是初始化或日期改变，重绘整个图表
+        // 传入 sIdx 和 eIdx 用于设定初始的 DataZoom 范围
+        initChart(allDates, isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
-    // 步骤2：初始化图表，加载全量数据
-    function initChartInstance(allDates, zoomStartIdx, zoomEndIdx) {
-        // 生成 Series 数据：这里先暂时给原始价格，具体的归一化在 renderView 中动态计算
+    // 2. 初始化图表
+    function initChart(allDates, startIdx, endIdx) {
+        if (!myChart) {
+            myChart = echarts.init(document.getElementById('chart-container'));
+            setupEvents();
+        }
+
+        // 初始数据：先填入原始数据，马上会被 updateNormalization 覆盖
         const series = currentRankedData.map(item => ({
             name: item.name,
             type: 'line',
             smooth: true,
             showSymbol: false, 
             lineStyle: { width: 2 },
-            data: item.fullData, // 先给全量原始数据
-            emphasis: { disabled: true }, // 禁用默认高亮，手动接管
-            z: 2 // 默认层级
+            data: item.rawData, 
+            emphasis: { disabled: true },
+            z: 2 
         }));
 
-        if (!myChart) {
-            myChart = echarts.init(document.getElementById('chart-container'));
-            setupChartEvents();
-        }
-
         const option = {
-            animation: false, // 禁用动画以提高缩放时的重绘性能
+            animation: false, // 关闭动画以获得极致的拖动响应速度
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
             tooltip: {
-                trigger: 'axis', // 既然有联动高亮，axis 触发其实查看数值更方便，配合单显逻辑
+                trigger: 'axis',
                 axisPointer: { type: 'line' },
                 formatter: function(params) {
-                    // 自定义 Tooltip，只显示当前可见的（未变暗的）
                     let html = params[0].axisValue + '<br/>';
                     params.forEach(p => {
-                        // 如果处于锁定模式，且不是锁定的那个，就不显示在 Tooltip 里
                         if (lockedSeries && p.seriesName !== lockedSeries) return;
-                        
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};"></span>`;
-                        // 计算显示的数值（百分比）
+                        // 显示相对于当前起点的涨幅
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `${colorDot}<b>${p.seriesName}</b>: ${valStr}<br/>`;
                     });
@@ -299,7 +287,7 @@
             },
             yAxis: {
                 type: 'value', 
-                scale: true,
+                scale: true, // 关键：让Y轴自动缩放适应当前形态
                 splitLine: { lineStyle: { color: '#f5f5f7' } },
                 axisLabel: { color: '#999', fontSize: 10, formatter: (val) => ((val-1)*100).toFixed(0) + '%' }
             },
@@ -311,9 +299,10 @@
                     bottom: 10,
                     height: 20,
                     borderColor: 'transparent',
-                    // 如果传入了初始缩放范围，则设置
-                    startValue: zoomStartIdx,
-                    endValue: zoomEndIdx
+                    handleSize: '80%',
+                    // 如果有传入范围，则设定；否则保持当前状态或默认
+                    startValue: startIdx,
+                    endValue: endIdx
                 },
                 {
                     type: 'inside',
@@ -326,46 +315,88 @@
             color: ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e']
         };
 
-        myChart.setOption(option, true); // 不合并，重置
+        myChart.setOption(option, true);
         
-        // 初始归一化（因为刚 setOption 时是原始价格）
-        if(zoomStartIdx !== null) {
-            updateNormalization(zoomStartIdx, zoomEndIdx);
-        } else {
-            // 如果不是自动缩放，获取当前的 zoom 状态来计算
-            const model = myChart.getModel().getComponent('dataZoom', 0);
-            const range = model.getAxisProxy('x').getMinMaxSpan(); // 获取当前索引范围
-            updateNormalization(Math.floor(range.min), Math.ceil(range.max));
+        // 立即执行一次归一化，确保看到的画面是对的
+        // 如果没有指定范围，就获取当前的 zoom 范围
+        if (startIdx == null) {
+             const model = myChart.getModel().getComponent('dataZoom', 0);
+             const range = model.getAxisProxy('x').getMinMaxSpan();
+             startIdx = Math.floor(range.min);
         }
-
+        updateDynamicNormalization(startIdx);
+        
         renderRankList(option.color);
     }
 
-    // 步骤3：核心功能 - 动态归一化
-    // 根据当前的视图起点，重新计算所有线的净值，使起点为 1.0
-    function updateNormalization(startIdx, endIdx) {
+    // 3. 核心：动态归一化更新
+    // 无论怎么缩放，只要调用这个，就会把所有线重置为以 startIdx 为基准
+    function updateDynamicNormalization(startIdx) {
         if (!currentRankedData.length) return;
-        
-        // 安全边界
         startIdx = Math.max(0, startIdx);
-        
-        const newSeriesData = currentRankedData.map(item => {
-            const basePrice = item.fullData[startIdx];
-            if (!basePrice) return item.fullData; // 异常保护
+
+        const newSeries = currentRankedData.map(item => {
+            // 获取当前可视区域左边缘的价格作为基准 (Base Price)
+            // 容错：如果 startIdx 超出数据范围，取最后一个有效数据
+            const baseIndex = Math.min(startIdx, item.rawData.length - 1);
+            const basePrice = item.rawData[baseIndex];
             
-            // 全量重新计算归一化，这样缩放时数据永远是对的
-            return item.fullData.map(p => parseFloat((p / basePrice).toFixed(4)));
+            // 如果基准价无效（比如停牌），防止除以0
+            if (!basePrice) return item.rawData;
+
+            // 全量重新计算：Price / BasePrice
+            return item.rawData.map(p => parseFloat((p / basePrice).toFixed(4)));
         });
 
+        // 增量更新数据，性能很高
         myChart.setOption({
-            series: newSeriesData.map((data, index) => ({
-                data: data
-            }))
+            series: newSeries.map(data => ({ data: data }))
         });
-        
-        // 同时更新列表上的涨跌幅显示（显示当前视窗内的涨跌，还是保持原始排名区间的？
-        // 用户习惯：列表显示的是排名的依据。
-        // 这里我们让列表保持“选定区间”的涨幅，而图表展示“动态区间”的走势，这样逻辑最清晰。
+    }
+
+    // 4. 事件监听
+    function setupEvents() {
+        // DataZoom 事件：监听缩放和拖动
+        myChart.on('dataZoom', function(params) {
+            // 获取当前可视范围的起点索引
+            const model = myChart.getModel().getComponent('dataZoom', 0);
+            const axisProxy = model.getAxisProxy('x');
+            const range = axisProxy.getMinMaxSpan();
+            const startIdx = Math.floor(range.min);
+            const endIdx = Math.ceil(range.max);
+
+            // 实时重算归一化
+            updateDynamicNormalization(startIdx);
+            
+            // 同步更新顶部的日期显示（视觉反馈）
+            if (rawData && rawData.dates) {
+                // 不触发 input change，只更新显示
+                const d1 = rawData.dates[Math.max(0, startIdx)];
+                const d2 = rawData.dates[Math.min(endIdx, rawData.dates.length-1)];
+                if (d1) document.getElementById('startDate').value = d1;
+                if (d2) document.getElementById('endDate').value = d2;
+            }
+        });
+
+        // 鼠标交互：高亮与锁定
+        myChart.getZr().on('click', function(params) {
+            if (!params.target) toggleLock(null);
+        });
+        myChart.on('click', function(params) {
+            if (params.componentType === 'series') toggleLock(params.seriesName);
+        });
+        myChart.on('mouseover', function(params) {
+            if (params.componentType === 'series') applyHighlight(params.seriesName);
+        });
+        myChart.on('mouseout', function(params) {
+            if (params.componentType === 'series') clearHighlight();
+        });
+    }
+
+    // 5. 辅助 UI 逻辑
+    function handleRankingInputChange() {
+        // 当用户手动修改输入框时，这是为了改变“谁上榜”，所以重新计算排名
+        calculateRankAndRender(false);
     }
 
     function renderRankList(colors) {
@@ -373,6 +404,7 @@
         let html = '';
         currentRankedData.forEach((item, index) => {
             const color = colors[index % colors.length];
+            // 列表显示的涨跌幅，依然是基于“选股范围”的，保持排名逻辑一致性
             const pctStr = (item.pct * 100).toFixed(2) + '%';
             const cls = item.pct >= 0 ? 'up' : 'down';
             
@@ -392,80 +424,21 @@
         container.innerHTML = html;
     }
 
-    // --- 事件处理 ---
-
-    function handleInputDateChange() {
-        // 当用户手动修改日期输入框时，意味着要重新计算排名
-        calculateRankAndRender(true);
-    }
-
-    // 防抖函数
-    let zoomTimer = null;
-    function setupChartEvents() {
-        // 1. DataZoom 监听：实现动态归一化和输入框更新
-        myChart.on('dataZoom', function(params) {
-            if (zoomTimer) clearTimeout(zoomTimer);
-            zoomTimer = setTimeout(() => {
-                // 获取当前 Zoom 的实际索引范围
-                const model = myChart.getModel().getComponent('dataZoom', 0);
-                const axisProxy = model.getAxisProxy('x');
-                const range = axisProxy.getMinMaxSpan();
-                const sIdx = Math.floor(range.min);
-                const eIdx = Math.ceil(range.max);
-                
-                // 1. 动态归一化
-                updateNormalization(sIdx, eIdx);
-
-                // 2. 更新日期输入框（可选，如果用户希望输入框跟随缩放变动）
-                // 为了避免逻辑冲突，这里只更新 UI，不触发 change 事件
-                const dates = rawData.dates;
-                if(dates[sIdx]) document.getElementById('startDate').value = dates[sIdx];
-                if(dates[eIdx]) document.getElementById('endDate').value = dates[Math.min(eIdx, dates.length-1)];
-
-            }, 50); // 极短延迟，保证流畅
-        });
-
-        // 2. 鼠标交互
-        myChart.getZr().on('click', function(params) {
-            if (!params.target) toggleLock(null); // 点击空白取消锁定
-        });
-        
-        myChart.on('click', function(params) {
-            if (params.componentType === 'series') toggleLock(params.seriesName);
-        });
-
-        myChart.on('mouseover', function(params) {
-            if (params.componentType === 'series') applyHighlight(params.seriesName);
-        });
-
-        myChart.on('mouseout', function(params) {
-            if (params.componentType === 'series') clearHighlight();
-        });
-    }
-
-    // --- 高亮核心逻辑 ---
-
+    // 高亮逻辑
     function applyHighlight(targetName) {
-        if (lockedSeries) return; // 如果已锁定，忽略悬停
-
-        doHighlightVisuals(targetName);
+        if (lockedSeries) return; 
+        updateVisuals(targetName);
     }
 
     function clearHighlight() {
-        if (lockedSeries) return; // 如果已锁定，忽略移出
-
-        // 恢复所有视觉状态
-        myChart.dispatchAction({ type: 'downplay', seriesName: 'all' }); // 这里的all可能无效，需要循环
-        // ECharts downplay 不传参不一定重置所有，最好的方式是重置 opacity
-        
-        // 简单暴力：让所有线变回正常
+        if (lockedSeries) return;
+        // 恢复默认：所有都不变暗
         myChart.setOption({
-            series: currentRankedData.map(d => ({
+            series: currentRankedData.map(() => ({
                 lineStyle: { opacity: 1, width: 2 },
                 z: 2
             }))
         });
-
         document.querySelectorAll('.list-item').forEach(el => {
             el.classList.remove('active-state', 'dimmed');
         });
@@ -473,36 +446,29 @@
 
     function toggleLock(targetName) {
         if (lockedSeries === targetName || targetName === null) {
-            // 解锁
             lockedSeries = null;
-            clearHighlight(); // 这里的 clear 会重置到默认状态
+            clearHighlight();
         } else {
-            // 锁定
             lockedSeries = targetName;
-            doHighlightVisuals(targetName);
+            updateVisuals(targetName);
         }
     }
 
-    // 执行高亮的视觉操作（变暗其他，高亮目标）
-    function doHighlightVisuals(targetName) {
-        // 1. 图表操作
-        // ECharts 的 highlight action 主要是显示 emphasis 样式
-        // 但我们需要“变暗其他”，所以直接 setOption 修改 opacity 最稳妥
-        
+    function updateVisuals(targetName) {
+        // 图表：其他变暗
         const newStyles = currentRankedData.map(item => {
             const isTarget = item.name === targetName;
             return {
                 lineStyle: {
-                    opacity: isTarget ? 1 : 0.1, // 目标不透明，其他变淡
+                    opacity: isTarget ? 1 : 0.1, 
                     width: isTarget ? 4 : 1
                 },
-                z: isTarget ? 10 : 2 // 目标层级置顶
+                z: isTarget ? 10 : 2
             };
         });
-
         myChart.setOption({ series: newStyles });
 
-        // 2. 列表操作
+        // 列表：其他变暗
         document.querySelectorAll('.list-item').forEach(el => {
             if (el.dataset.name === targetName) {
                 el.classList.add('active-state');
