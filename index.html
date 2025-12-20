@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (修复版)</title>
+    <title>行业强弱追踪 (绝对对齐版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -211,14 +211,12 @@
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
-        // 分配颜色
         currentRankedData.forEach((item, index) => {
             if (!industryColors[item.name]) {
                 industryColors[item.name] = colorPalette[index % colorPalette.length];
             }
         });
 
-        // 初始渲染，传入范围
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
@@ -258,7 +256,6 @@
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
-                    // 按照数值从大到小排序 tooltip
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
@@ -266,7 +263,6 @@
                         const fontWeight = isDimmed ? 'normal' : 'bold';
                         const dotOpacity = isDimmed ? '0.3' : '1';
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
-                        // 这里 p.value 已经是归一化后的值 (如 1.05)
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `<div style="color:${textColor}; font-weight:${fontWeight}">
                                     ${colorDot}${p.seriesName}: ${valStr}
@@ -312,7 +308,6 @@
 
         myChart.setOption(option, true);
         
-        // 初始计算
         if (startIdx === null) {
             const opt = myChart.getOption();
             const sPct = opt.dataZoom[0].start;
@@ -320,26 +315,19 @@
         }
         if (endIdx === null) endIdx = globalAllDates.length;
 
-        // 立即执行归一化和排序
         updateChartAndList(startIdx, endIdx);
     }
 
-    // 核心函数：统一处理 归一化 + 列表重算 + 排序
+    // 核心函数：归一化 + 列表重算 + 排序
     function updateChartAndList(sIdx, eIdx) {
-        // 1. 安全边界处理
         sIdx = Math.max(0, Math.min(sIdx, globalAllDates.length - 1));
-        // eIdx 在 slice 时不包含，但取数据时需要是有效索引，所以取 min
         eIdx = Math.min(eIdx, globalAllDates.length); 
-        // 实际结束数据的索引
         const actualEndIdx = Math.max(sIdx, eIdx - 1); 
 
-        // 2. 动态归一化 (修复数字巨大问题)
         const newSeries = currentRankedData.map(item => {
             let basePrice = item.fullData[sIdx];
             
-            // 严谨容错：防止分母为0或空
             if (!basePrice || basePrice === 0) {
-                // 向后寻找最近的有效非0价格
                 for(let i = sIdx; i < item.fullData.length; i++) {
                     if(item.fullData[i] && item.fullData[i] !== 0) { 
                         basePrice = item.fullData[i]; 
@@ -348,26 +336,29 @@
                 }
             }
             
-            // 如果整条线都没数据，返回空数组
             if (!basePrice) return item.fullData.map(() => null);
 
-            return item.fullData.map(p => {
-                if (!p) return null;
-                // 结果：1.0000 起步
+            // --- 终极修复：数据屏蔽 (Masking) ---
+            // 强行把 startIdx 之前的数据设为 null，
+            // 这样线条就会在 startIdx 这个点“凭空出现”，位置正好是 0%
+            return item.fullData.map((p, i) => {
+                if (i < sIdx || !p) return null;
                 return parseFloat((p / basePrice).toFixed(4));
             });
         });
         
-        // 更新图表数据
-        myChart.setOption({ series: newSeries.map(data => ({ data: data })) });
+        // 更新图表
+        myChart.setOption({ 
+            series: newSeries.map(data => ({ data: data })),
+            // 同时强制 dataZoom 锁定到这个整数索引，防止浮点数漂移
+            dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
+        });
 
-        // 3. 计算区间收益率 并 重新排序
-        // 复制一份数据用于排序，不影响 currentRankedData 的原始顺序（用于 Series 对应）
-        // 但我们需要重新渲染列表，所以创建一个带临时收益率的对象数组
+        // 列表排序逻辑
         const sortedList = currentRankedData.map(item => {
             const startP = item.fullData[sIdx];
             const endP = item.fullData[actualEndIdx];
-            let currentPct = -999; // 默认极小值排最后
+            let currentPct = -999; 
 
             if (startP && endP && startP !== 0) {
                 currentPct = (endP - startP) / startP;
@@ -378,19 +369,14 @@
             };
         });
 
-        // 执行排序：从大到小
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
-
-        // 4. 重新渲染右侧列表
         renderRankList(sortedList);
         
-        // 5. 保持高亮状态 (如果当前有锁定)
         if (lockedSeries) {
             updateVisuals(lockedSeries);
         }
     }
 
-    // 渲染列表 DOM
     function renderRankList(sortedData) {
         const container = document.getElementById('rankList');
         let html = '';
@@ -404,7 +390,6 @@
                 cls = item.currentPct >= 0 ? 'up' : 'down';
             }
 
-            // 保持选中状态样式
             let itemClass = 'list-item';
             if (lockedSeries) {
                 if (lockedSeries === item.name) itemClass += ' active-state';
@@ -429,27 +414,23 @@
 
     function setupEvents() {
         myChart.on('dataZoom', function(params) {
-            // 使用百分比计算，修复之前像素转换的 BUG
             const opt = myChart.getOption();
             const startPct = opt.dataZoom[0].start;
             const endPct = opt.dataZoom[0].end;
             
             const totalLen = globalAllDates.length;
-            // 确保索引有效
             const sIdx = Math.floor(totalLen * startPct / 100);
             const eIdx = Math.ceil(totalLen * endPct / 100);
 
-            // 核心调用：归一化 + 排序 + 渲染列表
             updateChartAndList(sIdx, eIdx);
 
-            // 更新输入框
             if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
             const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
             if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
         });
 
-        // 交互事件
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
+        
         myChart.on('click', function(params) { 
             if (params.componentType === 'series') toggleLock(params.seriesName); 
         });
@@ -482,7 +463,6 @@
     }
 
     function updateVisuals(targetName) {
-        // 1. 图表样式
         const newStyles = currentRankedData.map(item => {
             const isTarget = targetName ? (item.name === targetName) : true;
             const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
@@ -495,7 +475,6 @@
         });
         myChart.setOption({ series: newStyles });
 
-        // 2. 列表样式
         document.querySelectorAll('.list-item').forEach(el => {
             if (!targetName) {
                 el.classList.remove('active-state', 'dimmed');
