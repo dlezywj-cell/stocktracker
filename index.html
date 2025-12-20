@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (视觉微调版)</title>
+    <title>行业强弱追踪 (实时联动版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -30,6 +30,7 @@
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
+        
         .control-panel {
             background: var(--bg); padding: 10px 16px; flex-shrink: 0;
             display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
@@ -49,13 +50,16 @@
             background: var(--primary); color: white; border: none; width: 28px; height: 28px;
             border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
+
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
+        
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; position: relative; min-width: 0;
         }
         #chart-container { width: 100%; height: 100%; }
+
         .list-wrapper {
             width: 260px; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
@@ -68,25 +72,31 @@
         .list-body { flex: 1; overflow-y: auto; padding: 4px 0; }
         .list-body::-webkit-scrollbar { width: 4px; }
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
+
         .list-item {
             padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; cursor: pointer; border-bottom: 1px solid transparent;
             transition: all 0.2s; opacity: 1;
         }
         .list-item:hover { background: #f9f9f9; }
+        /* 选中/高亮状态 */
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
-        .list-item.dimmed { opacity: 0.3; filter: grayscale(100%); } /* 列表也稍微调亮一点 */
+        /* 变暗状态 */
+        .list-item.dimmed { opacity: 0.35; filter: grayscale(100%); } 
+
         .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .idx-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;}
         .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
         .up { color: var(--danger); }
         .down { color: var(--success); }
+
         .loading-mask {
             position: absolute; inset: 0; background: rgba(255,255,255,0.9);
             display: flex; align-items: center; justify-content: center; z-index: 10;
             font-size: 13px; color: var(--text-sec); opacity: 0; pointer-events: none; transition: opacity 0.3s;
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
+
         @media (max-width: 768px) {
             body { height: auto; overflow-y: auto; }
             .workspace { flex-direction: column; height: auto; padding: 0; gap: 0; }
@@ -128,11 +138,12 @@
         <div class="list-header">
             <span>行业名称</span>
             <span style="font-weight:normal;color:#999;font-size:10px;">(拖动图表缩放)</span>
-            <span>选定区间涨幅</span>
+            <span>区间收益率</span>
         </div>
         <div class="list-body" id="rankList"></div>
     </div>
 </div>
+
 <script>
     let rawData = null; 
     let myChart = null;
@@ -186,6 +197,7 @@
         let eIdx = globalAllDates.findIndex(d => d > eDate);
         if (eIdx === -1) eIdx = globalAllDates.length;
 
+        // 计算排名（这一步只决定“谁上榜”，顺序固定）
         let tempRank = [];
         Object.keys(rawData.data).forEach(name => {
             const prices = rawData.data[name];
@@ -201,6 +213,9 @@
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
+        // 生成列表结构（数值稍后会由 DataZoom 事件实时填充）
+        renderRankListStructure(currentRankedData, ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e']);
+
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
@@ -217,10 +232,11 @@
             showSymbol: false, 
             lineStyle: { width: 2 },
             data: item.fullData, 
-            emphasis: { disabled: true },
+            emphasis: { disabled: true }, // 手动管理高亮
             z: 2 
         }));
 
+        // 计算百分比
         let startPercent = 0;
         let endPercent = 100;
         if (startIdx !== null && endIdx !== null && globalAllDates.length > 0) {
@@ -231,8 +247,6 @@
         const option = {
             animation: false, 
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
-            
-            // --- 核心修改：Tooltip 视觉微调 ---
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
@@ -240,22 +254,15 @@
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
-                    
                     params.sort((a,b) => b.value - a.value);
-
                     params.forEach(p => {
                         const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
-                        
-                        // 1. 文字颜色：变暗的用灰色 #999，高亮的用默认深色
                         const textColor = isDimmed ? '#999' : '#333';
-                        // 2. 字重：高亮的加粗，变暗的正常
                         const fontWeight = isDimmed ? 'normal' : 'bold';
-                        // 3. 小圆点透明度：变暗的稍微淡一点
                         const dotOpacity = isDimmed ? '0.5' : '1';
                         
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
-                        
                         html += `<div style="color:${textColor}; font-weight:${fontWeight}">
                                     ${colorDot}${p.seriesName}: ${valStr}
                                  </div>`;
@@ -301,15 +308,20 @@
 
         myChart.setOption(option, true);
         
+        // 确保初始加载时也更新列表数值
         if (startIdx === null) {
             const opt = myChart.getOption();
             const sPct = opt.dataZoom[0].start;
             startIdx = Math.floor(globalAllDates.length * sPct / 100);
         }
+        // 初始计算需要一个 endIdx，如果没传就默认到最后
+        if (endIdx === null) endIdx = globalAllDates.length;
+        
         updateDynamicNormalization(startIdx);
-        renderRankList(option.color);
+        updateListValues(startIdx, endIdx); // 立即更新列表数值
     }
 
+    // 核心：动态归一化图表数据
     function updateDynamicNormalization(viewStartIdx) {
         if (!currentRankedData.length) return;
         viewStartIdx = Math.max(0, Math.min(viewStartIdx, globalAllDates.length - 1));
@@ -322,15 +334,34 @@
                 }
             }
             if (!basePrice) return item.fullData; 
-
-            return item.fullData.map(p => {
-                if(!p) return null;
-                return parseFloat((p / basePrice).toFixed(4));
-            });
+            return item.fullData.map(p => p ? parseFloat((p / basePrice).toFixed(4)) : null);
         });
 
-        myChart.setOption({
-            series: newSeries.map(data => ({ data: data }))
+        myChart.setOption({ series: newSeries.map(data => ({ data: data })) });
+    }
+
+    // 新增：动态更新列表中的收益率数值
+    function updateListValues(sIdx, eIdx) {
+        // 安全边界检查
+        sIdx = Math.max(0, sIdx);
+        eIdx = Math.min(eIdx, globalAllDates.length);
+        // eIdx 在 slice 中是不包含的，所以取值时要 -1
+        const actualEndIdx = Math.max(sIdx, eIdx - 1);
+
+        currentRankedData.forEach(item => {
+            const startP = item.fullData[sIdx];
+            const endP = item.fullData[actualEndIdx];
+            const valSpan = document.getElementById(`val-${item.name}`);
+            
+            if (valSpan && startP && endP) {
+                const newPct = (endP - startP) / startP;
+                const pctStr = (newPct * 100).toFixed(2) + '%';
+                
+                // 更新文本
+                valSpan.innerText = (newPct >= 0 ? '+' : '') + pctStr;
+                // 更新颜色样式
+                valSpan.className = 'idx-val ' + (newPct >= 0 ? 'up' : 'down');
+            }
         });
     }
 
@@ -344,15 +375,27 @@
             const sIdx = Math.floor(totalLen * startPct / 100);
             const eIdx = Math.ceil(totalLen * endPct / 100);
 
+            // 1. 图表归一化
             updateDynamicNormalization(sIdx);
+            
+            // 2. 列表数值更新 (新功能)
+            updateListValues(sIdx, eIdx);
 
+            // 3. 顶部输入框更新
             if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
             const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
             if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
         });
 
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
-        myChart.on('click', function(params) { if (params.componentType === 'series') toggleLock(params.seriesName); });
+        
+        // --- 核心修复：点击图表线条 = 点击列表 ---
+        myChart.on('click', function(params) { 
+            if (params.componentType === 'series') {
+                toggleLock(params.seriesName); // 调用统一的锁定逻辑
+            }
+        });
+
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
         myChart.on('mouseout', function(params) { if (params.componentType === 'series') clearHighlight(); });
     }
@@ -361,13 +404,12 @@
         calculateRankAndRender(false);
     }
 
-    function renderRankList(colors) {
+    // 只生成 DOM 结构，不填数值（数值由 updateListValues 填充）
+    function renderRankListStructure(data, colors) {
         const container = document.getElementById('rankList');
         let html = '';
-        currentRankedData.forEach((item, index) => {
+        data.forEach((item, index) => {
             const color = colors[index % colors.length];
-            const pctStr = (item.pct * 100).toFixed(2) + '%';
-            const cls = item.pct >= 0 ? 'up' : 'down';
             html += `
             <div class="list-item" id="item-${item.name}" 
                  data-name="${item.name}"
@@ -378,7 +420,8 @@
                     <div class="idx-dot" style="background:${color}"></div>
                     ${index + 1}. ${item.name}
                 </div>
-                <div class="idx-val ${cls}">${item.pct >= 0 ? '+' : ''}${pctStr}</div>
+                <!-- ID 用于后续 JS 动态更新数值 -->
+                <div class="idx-val" id="val-${item.name}">--%</div>
             </div>`;
         });
         container.innerHTML = html;
@@ -388,49 +431,54 @@
         if (lockedSeries) return; 
         updateVisuals(targetName);
     }
+    
     function clearHighlight() {
         if (lockedSeries) return;
-        myChart.setOption({
-            series: currentRankedData.map(() => ({
-                lineStyle: { opacity: 1, width: 2 },
-                z: 2
-            }))
-        });
-        document.querySelectorAll('.list-item').forEach(el => {
-            el.classList.remove('active-state', 'dimmed');
-        });
+        updateVisuals(null); // 恢复正常
     }
+    
     function toggleLock(targetName) {
         if (lockedSeries === targetName || targetName === null) {
-            lockedSeries = null;
-            clearHighlight();
+            lockedSeries = null; // 解锁
+            updateVisuals(null); // 恢复全显
         } else {
-            lockedSeries = targetName;
+            lockedSeries = targetName; // 锁定
             updateVisuals(targetName);
         }
     }
-    // --- 核心修改：视觉状态更新逻辑 ---
+
+    // 统一的视觉状态管理函数
     function updateVisuals(targetName) {
+        // 1. 更新图表样式
         const newStyles = currentRankedData.map(item => {
-            const isTarget = item.name === targetName;
+            // 如果没有 targetName (null)，则全部恢复显示
+            const isTarget = targetName ? (item.name === targetName) : true;
+            // 如果有 targetName，非目标的变暗
+            const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
+            const width = isTarget ? (targetName ? 4 : 2) : 1;
+            const z = isTarget ? 10 : 2;
+
             return {
-                lineStyle: { 
-                    // 调整这里：从 0.1 改为 0.35，保证背景线条可见
-                    opacity: isTarget ? 1 : 0.35, 
-                    width: isTarget ? 4 : 1 
-                },
-                z: isTarget ? 10 : 2
+                lineStyle: { opacity: opacity, width: width },
+                z: z
             };
         });
         myChart.setOption({ series: newStyles });
+
+        // 2. 更新列表样式
         document.querySelectorAll('.list-item').forEach(el => {
-            if (el.dataset.name === targetName) {
-                el.classList.add('active-state');
-                el.classList.remove('dimmed');
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (!targetName) {
+                // 全部恢复
+                el.classList.remove('active-state', 'dimmed');
             } else {
-                el.classList.remove('active-state');
-                el.classList.add('dimmed');
+                if (el.dataset.name === targetName) {
+                    el.classList.add('active-state');
+                    el.classList.remove('dimmed');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    el.classList.remove('active-state');
+                    el.classList.add('dimmed');
+                }
             }
         });
     }
