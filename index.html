@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (精准对齐版)</title>
+    <title>行业强弱追踪 (精准归一化)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -30,7 +30,6 @@
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
-        
         .control-panel {
             background: var(--bg); padding: 10px 16px; flex-shrink: 0;
             display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
@@ -50,16 +49,13 @@
             background: var(--primary); color: white; border: none; width: 28px; height: 28px;
             border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
-        
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; position: relative; min-width: 0;
         }
         #chart-container { width: 100%; height: 100%; }
-
         .list-wrapper {
             width: 260px; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
@@ -72,31 +68,25 @@
         .list-body { flex: 1; overflow-y: auto; padding: 4px 0; }
         .list-body::-webkit-scrollbar { width: 4px; }
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
-
         .list-item {
             padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; cursor: pointer; border-bottom: 1px solid transparent;
             transition: all 0.2s; opacity: 1;
         }
         .list-item:hover { background: #f9f9f9; }
-        /* 选中/高亮状态 */
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
-        /* 变暗状态 */
-        .list-item.dimmed { opacity: 0.35; filter: grayscale(100%); } 
-
+        .list-item.dimmed { opacity: 0.35; filter: grayscale(100%); }
         .idx-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .idx-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;}
         .idx-val { font-family: "SF Mono", monospace; font-weight: 500; }
         .up { color: var(--danger); }
         .down { color: var(--success); }
-
         .loading-mask {
             position: absolute; inset: 0; background: rgba(255,255,255,0.9);
             display: flex; align-items: center; justify-content: center; z-index: 10;
             font-size: 13px; color: var(--text-sec); opacity: 0; pointer-events: none; transition: opacity 0.3s;
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
-
         @media (max-width: 768px) {
             body { height: auto; overflow-y: auto; }
             .workspace { flex-direction: column; height: auto; padding: 0; gap: 0; }
@@ -197,6 +187,7 @@
         let eIdx = globalAllDates.findIndex(d => d > eDate);
         if (eIdx === -1) eIdx = globalAllDates.length;
 
+        // 计算排名区间
         let tempRank = [];
         Object.keys(rawData.data).forEach(name => {
             const prices = rawData.data[name];
@@ -205,6 +196,7 @@
             const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
             if (startPrice && endPrice) {
                 const pct = (endPrice - startPrice) / startPrice;
+                // 保存 fullData
                 tempRank.push({ name: name, pct: pct, fullData: prices });
             }
         });
@@ -212,6 +204,7 @@
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
+        // 渲染列表结构
         renderRankListStructure(currentRankedData, ['#ff3b30', '#ff9500', '#ffcc00', '#4cd964', '#5ac8fa', '#007aff', '#5856d6', '#ff2d55', '#5856d6', '#a2845e']);
 
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
@@ -228,10 +221,10 @@
             type: 'line',
             smooth: true,
             showSymbol: false, 
-            triggerLineEvent: true, // 关键：允许线条触发点击事件
+            triggerLineEvent: true,
             lineStyle: { width: 2 },
             data: item.fullData, 
-            emphasis: { disabled: true }, 
+            emphasis: { disabled: true },
             z: 2 
         }));
 
@@ -243,7 +236,7 @@
         }
 
         const option = {
-            animation: false, 
+            animation: false, // 必须关闭动画，保证归一化不闪烁
             grid: { left: '40', right: '20', bottom: '45', top: '30', containLabel: false },
             tooltip: {
                 trigger: 'axis',
@@ -258,7 +251,6 @@
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
                         const dotOpacity = isDimmed ? '0.5' : '1';
-                        
                         const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `<div style="color:${textColor}; font-weight:${fontWeight}">
@@ -306,37 +298,28 @@
 
         myChart.setOption(option, true);
         
-        // 初始逻辑
+        // 确保初始加载对齐
         if (startIdx === null) {
             const opt = myChart.getOption();
-            // 直接读取 model 获取更准确的初始值
-            const model = myChart.getModel().getComponent('dataZoom', 0);
-            if (model) {
-                const range = model.getAxisProxy('x').getMinMaxSpan();
-                startIdx = Math.floor(range.min);
-                endIdx = Math.ceil(range.max);
-            } else {
-                 const sPct = opt.dataZoom[0].start;
-                 startIdx = Math.floor(globalAllDates.length * sPct / 100);
-            }
+            const sPct = opt.dataZoom[0].start;
+            startIdx = Math.floor(globalAllDates.length * sPct / 100);
         }
         if (endIdx === null) endIdx = globalAllDates.length;
-        
+
         updateDynamicNormalization(startIdx);
         updateListValues(startIdx, endIdx);
     }
 
-    // 核心修复：精准归一化
+    // 核心函数：动态归一化
+    // 强制把 viewStartIdx 这一天的数据设为 1.0 (0%)
     function updateDynamicNormalization(viewStartIdx) {
         if (!currentRankedData.length) return;
-        // 确保索引完全合法
         viewStartIdx = Math.max(0, Math.min(viewStartIdx, globalAllDates.length - 1));
 
         const newSeries = currentRankedData.map(item => {
-            // 获取基准价格
             let basePrice = item.fullData[viewStartIdx];
             
-            // 容错：如果该点无数据（停牌），向后搜索最近的有效价格
+            // 容错：如果基准日没数据，向后找
             if (!basePrice) {
                 for(let i=viewStartIdx; i<item.fullData.length; i++) {
                     if(item.fullData[i]) { basePrice = item.fullData[i]; break; }
@@ -344,13 +327,16 @@
             }
             if (!basePrice) return item.fullData; 
 
-            // 执行归一化
+            // 执行除法
             return item.fullData.map(p => p ? parseFloat((p / basePrice).toFixed(4)) : null);
         });
 
+        // 增量更新数据，不重绘整个图表，性能高
         myChart.setOption({ series: newSeries.map(data => ({ data: data })) });
     }
 
+    // 核心函数：更新列表收益率
+    // 收益率 = (结束价 - 开始价) / 开始价
     function updateListValues(sIdx, eIdx) {
         sIdx = Math.max(0, sIdx);
         eIdx = Math.min(eIdx, globalAllDates.length);
@@ -361,43 +347,49 @@
             const endP = item.fullData[actualEndIdx];
             const valSpan = document.getElementById(`val-${item.name}`);
             
-            if (valSpan && startP && endP) {
-                const newPct = (endP - startP) / startP;
-                const pctStr = (newPct * 100).toFixed(2) + '%';
-                valSpan.innerText = (newPct >= 0 ? '+' : '') + pctStr;
-                valSpan.className = 'idx-val ' + (newPct >= 0 ? 'up' : 'down');
+            if (valSpan) {
+                if (startP && endP) {
+                    const newPct = (endP - startP) / startP;
+                    const pctStr = (newPct * 100).toFixed(2) + '%';
+                    valSpan.innerText = (newPct >= 0 ? '+' : '') + pctStr;
+                    valSpan.className = 'idx-val ' + (newPct >= 0 ? 'up' : 'down');
+                } else {
+                    valSpan.innerText = '--';
+                    valSpan.className = 'idx-val';
+                }
             }
         });
     }
 
     function setupEvents() {
+        // DataZoom 缩放监听
         myChart.on('dataZoom', function(params) {
-            // 核心修复：不再依赖百分比，而是从 Model 获取精确的索引值
-            // 这解决了归一化基准点和图表左边缘“各自飞”的问题
-            const model = myChart.getModel().getComponent('dataZoom', 0);
-            const axisProxy = model.getAxisProxy('x');
-            const range = axisProxy.getMinMaxSpan();
+            // 使用 getOption 获取当前百分比，保证平滑
+            const opt = myChart.getOption();
+            const startPct = opt.dataZoom[0].start;
+            const endPct = opt.dataZoom[0].end;
             
-            // Math.floor 确保取到的是当前视窗左边缘的那一天（或者稍微前面一点），
-            // 保证图表起始点肯定是 0%
-            const sIdx = Math.floor(range.min);
-            const eIdx = Math.ceil(range.max);
+            const totalLen = globalAllDates.length;
+            // 计算当前视窗对应的准确索引
+            const sIdx = Math.floor(totalLen * startPct / 100);
+            const eIdx = Math.ceil(totalLen * endPct / 100);
 
+            // 1. 图表归一化：图表最左边变成 0%
             updateDynamicNormalization(sIdx);
+            
+            // 2. 列表数值更新：计算视窗内的收益率
             updateListValues(sIdx, eIdx);
 
+            // 3. 顶部输入框更新
             if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
-            const safeEndIdx = Math.min(eIdx - 1, globalAllDates.length - 1);
+            const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
             if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
         });
 
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
         
-        // 核心修复：点击事件
         myChart.on('click', function(params) { 
-            if (params.componentType === 'series') {
-                toggleLock(params.seriesName); 
-            }
+            if (params.componentType === 'series') toggleLock(params.seriesName); 
         });
 
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
@@ -452,6 +444,7 @@
     function updateVisuals(targetName) {
         const newStyles = currentRankedData.map(item => {
             const isTarget = targetName ? (item.name === targetName) : true;
+            // 样式：非目标时透明度 0.35
             const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
             const width = isTarget ? (targetName ? 4 : 2) : 1;
             const z = isTarget ? 10 : 2;
