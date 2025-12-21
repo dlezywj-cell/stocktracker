@@ -16,11 +16,9 @@
             --success: #34c759;
             --danger: #ff3b30;
             --radius: 12px;
-            /* 新增表头背景色，浅灰蓝，既护眼又能分割 */
             --header-bg: #f2f4f8; 
         }
         
-        /* --- 全局滚动锁定 --- */
         html, body {
             height: 100%;
             width: 100%;
@@ -45,7 +43,6 @@
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
         
-        /* --- 控制栏 --- */
         .control-panel {
             background: var(--bg); padding: 8px 12px; flex-shrink: 0;
             display: flex; 
@@ -81,7 +78,6 @@
             flex-shrink: 0;
         }
         
-        /* --- 手机端控制栏适配 --- */
         @media (max-width: 768px) {
             .control-panel {
                 padding: 8px 5px; 
@@ -105,7 +101,6 @@
             }
         }
 
-        /* --- 工作区布局 --- */
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
         
         .chart-wrapper {
@@ -121,23 +116,17 @@
             display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
         }
 
-        /* --- 核心修改：表头样式增强 --- */
         .list-header {
-            padding: 12px 16px; /* 增加一点内边距 */
+            padding: 12px 16px; 
             font-size: 13px; 
-            font-weight: 700; /* 加粗 */
-            color: var(--text-main); /* 颜色加深 */
-            
-            /* 背景高亮设计 */
+            font-weight: 700; 
+            color: var(--text-main);
             background: var(--header-bg); 
-            
-            /* 上下边框增强分割感 */
             border-top: 1px solid #e5e5e5;
             border-bottom: 1px solid #dcdcdc; 
-            
             display: flex; justify-content: space-between; align-items: center;
             flex-shrink: 0; z-index: 1;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02); /* 微弱阴影 */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
 
         .list-body { flex: 1; overflow-y: auto; padding: 4px 0; background: var(--card); }
@@ -145,9 +134,9 @@
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
         
         .list-item {
-            padding: 10px 16px; /* 列表项稍微加宽一点内边距，为了美观 */
+            padding: 10px 16px; 
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; /* 列表间微弱分割线 */
+            font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; 
             transition: transform 0.2s, background 0.2s, opacity 0.2s; 
             opacity: 1;
         }
@@ -172,7 +161,6 @@
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
-        /* --- 手机端分屏布局 --- */
         @media (max-width: 768px) {
             .workspace { 
                 flex-direction: column; 
@@ -181,20 +169,15 @@
                 gap: 0; 
                 overflow: hidden; 
             }
-            
-            /* 上半部分：图表占 55% */
             .chart-wrapper { 
                 flex: 0 0 55vh; 
                 height: auto;
                 min-height: 250px; 
                 border-radius: 0; 
                 box-shadow: none;
-                /* 图表底部边框去掉，交由表头顶部边框来处理分割 */
                 border-bottom: none; 
                 z-index: 2; 
             }
-            
-            /* 下半部分：列表占剩余空间 */
             .list-wrapper { 
                 width: 100%; 
                 flex: 1; 
@@ -206,15 +189,12 @@
                 flex-direction: column;
                 overflow: hidden; 
             }
-            
-            /* 表头在手机端看起来更像一个分割条 */
             .list-header {
                 font-size: 12px;
                 padding: 8px 12px;
-                background: #f0f2f5; /* 手机端背景稍微深一点，区分更明显 */
-                border-top: 1px solid #dcdcdc; /* 明显的顶部分割线 */
+                background: #f0f2f5; 
+                border-top: 1px solid #dcdcdc; 
             }
-
             .list-body { 
                 flex: 1; 
                 overflow-y: auto; 
@@ -266,7 +246,10 @@
 <script>
     let rawData = null; 
     let myChart = null;
-    let lockedSeries = null;
+    
+    // --- 修改点：使用Set来支持多选 ---
+    let selectedSeries = new Set();
+    
     let currentRankedData = []; 
     let globalAllDates = [];
     let visibilityState = {};
@@ -313,7 +296,8 @@
 
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
-        lockedSeries = null;
+        // 每次重新计算排名时，清空选择，防止逻辑错乱
+        selectedSeries.clear();
         visibilityState = {};
         industryColors = {}; 
 
@@ -389,7 +373,8 @@
 
         const option = {
             animation: false, 
-            grid: { left: '45', right: '20', bottom: '45', top: '30', containLabel: false },
+            // --- 修改点：Grid顶部空间加大，底部空间减小 ---
+            grid: { left: '45', right: '20', bottom: '30', top: '50', containLabel: false },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
@@ -400,7 +385,9 @@
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
-                        const isDimmed = lockedSeries && p.seriesName !== lockedSeries;
+                        // --- 修改点：Tooltip配合多选逻辑变暗 ---
+                        const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
+                        
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
                         const dotOpacity = isDimmed ? '0.3' : '1';
@@ -431,7 +418,9 @@
                     type: 'slider',
                     show: true,
                     xAxisIndex: 0,
-                    bottom: 10,
+                    // --- 修改点：Move Bar to Top ---
+                    top: 5,
+                    bottom: undefined, 
                     height: 20,
                     borderColor: 'transparent',
                     handleSize: '80%',
@@ -489,7 +478,6 @@
             return { data: processedData };
         });
         
-        // 核心：强制锁定结束日期逻辑
         myChart.setOption({ 
             series: newSeries,
             dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
@@ -512,8 +500,9 @@
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
         
-        if (lockedSeries) {
-            updateVisuals(lockedSeries);
+        // 保持选择状态
+        if (selectedSeries.size > 0) {
+            updateVisuals(null);
         }
     }
 
@@ -533,8 +522,9 @@
             let itemClass = 'list-item';
             if (!visibilityState[item.name]) {
                 itemClass += ' unchecked';
-            } else if (lockedSeries) {
-                if (lockedSeries === item.name) itemClass += ' active-state';
+            } else if (selectedSeries.size > 0) {
+                // --- 修改点：列表渲染配合多选 ---
+                if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
 
@@ -562,8 +552,9 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
-        if (!visibilityState[name] && lockedSeries === name) {
-            lockedSeries = null;
+        // 如果取消可见性，同时从高亮集合中移除
+        if (!visibilityState[name] && selectedSeries.has(name)) {
+            selectedSeries.delete(name);
             updateVisuals(null); 
         }
         const opt = myChart.getOption();
@@ -576,7 +567,6 @@
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
             
-            // 锁定结束日期的核心逻辑
             const startPct = opt.dataZoom[0].start;
             const totalLen = globalAllDates.length;
             let sIdx = Math.floor(totalLen * startPct / 100);
@@ -609,52 +599,80 @@
 
     function applyHighlight(targetName) {
         if (!visibilityState[targetName]) return;
-        if (lockedSeries) return; 
+        // --- 修改点：如果有选中项，禁用悬停高亮，保持选中状态 ---
+        if (selectedSeries.size > 0) return; 
         updateVisuals(targetName);
     }
     
     function clearHighlight() {
-        if (lockedSeries) return;
+        if (selectedSeries.size > 0) return;
         updateVisuals(null); 
     }
     
+    // --- 修改点：切换多选逻辑 ---
     function toggleLock(targetName) {
         if (targetName && !visibilityState[targetName]) return;
-        if (lockedSeries === targetName || targetName === null) {
-            lockedSeries = null; 
-            updateVisuals(null); 
+        
+        if (targetName === null) {
+            // 点击背景，清空所有选择
+            selectedSeries.clear();
         } else {
-            lockedSeries = targetName; 
-            updateVisuals(targetName);
+            if (selectedSeries.has(targetName)) {
+                // 如果已存在，则移除（取消选中）
+                selectedSeries.delete(targetName);
+            } else {
+                // 如果不存在，则添加（多选）
+                selectedSeries.add(targetName);
+            }
         }
+        updateVisuals(null); 
     }
 
-    function updateVisuals(targetName) {
+    // --- 修改点：视觉更新函数适配多选逻辑 ---
+    function updateVisuals(hoverName) {
+        const hasSelection = selectedSeries.size > 0;
+
         const newStyles = currentRankedData.map(item => {
-            const isTarget = targetName ? (item.name === targetName) : true;
-            const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
-            const width = isTarget ? (targetName ? 4 : 2) : 1;
-            const z = isTarget ? 10 : 2;
-            return {
-                lineStyle: { opacity: opacity, width: width },
-                z: z
-            };
+            // 判断是否应该高亮
+            let isHighlighted = false;
+            
+            if (hasSelection) {
+                // 如果有选中项，只高亮Set里的
+                isHighlighted = selectedSeries.has(item.name);
+            } else if (hoverName) {
+                // 如果没选中项但有鼠标悬停，高亮悬停的
+                isHighlighted = item.name === hoverName;
+            } else {
+                // 都没有，显示默认状态（全不透明）
+                return { lineStyle: { opacity: 1, width: 2 }, z: 2 };
+            }
+
+            if (isHighlighted) {
+                return { lineStyle: { opacity: 1, width: 4 }, z: 10 };
+            } else {
+                return { lineStyle: { opacity: 0.35, width: 1 }, z: 2 };
+            }
         });
+        
         myChart.setOption({ series: newStyles });
 
         document.querySelectorAll('.list-item').forEach(el => {
             const name = el.dataset.name;
             if (!visibilityState[name]) return;
 
-            if (!targetName) {
-                el.classList.remove('active-state', 'dimmed');
-            } else {
-                if (name === targetName) {
+            el.classList.remove('active-state', 'dimmed');
+
+            if (hasSelection) {
+                if (selectedSeries.has(name)) {
                     el.classList.add('active-state');
-                    el.classList.remove('dimmed');
+                } else {
+                    el.classList.add('dimmed');
+                }
+            } else if (hoverName) {
+                if (name === hoverName) {
+                    el.classList.add('active-state');
                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } else {
-                    el.classList.remove('active-state');
                     el.classList.add('dimmed');
                 }
             }
