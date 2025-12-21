@@ -516,4 +516,39 @@
 
     function updateVisuals(targetName) {
         const newStyles = currentRankedData.map(item => {
-            const is
+            const isTarget = targetName ? (item.name === targetName) : true;
+            const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
+            const width = isTarget ? (targetName ? 4 : 2) : 1;
+            const z = isTarget ? 10 : 2;
+            return {
+                lineStyle: { opacity: opacity, width: width },
+                z: z
+            };
+        });
+        myChart.setOption({ series: newStyles });
+
+        document.querySelectorAll('.list-item').forEach(el => {
+            const name = el.dataset.name;
+            if (!visibilityState[name]) return;
+
+            if (!targetName) {
+                el.classList.remove('active-state', 'dimmed');
+            } else {
+                if (name === targetName) {
+                    el.classList.add('active-state');
+                    el.classList.remove('dimmed');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    el.classList.remove('active-state');
+                    el.classList.add('dimmed');
+                }
+            }
+        });
+    }
+
+    window.addEventListener('resize', () => myChart && myChart.resize());
+    initDate();
+    fetchData(); 
+</script>
+</body>
+</html>
