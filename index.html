@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (逻辑一致版)</title>
+    <title>行业强弱追踪 (高对比版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -151,18 +151,18 @@
     let globalAllDates = [];
     let visibilityState = {};
     
-    // 修改处：颜色渐变逻辑 —— 红(强) -> 粉(中) -> 灰(弱)
+    // 修改处：颜色高区分度逻辑 —— 严格按照您的要求：红->橙->蓝->紫->绿...
     const colorPalette = [
-        '#8B0000', // 1. 深红 (最强)
-        '#CC0000', // 2. 鲜红
-        '#FF0000', // 3. 正红
-        '#FF4500', // 4. 橙红
-        '#FF1493', // 5. 深粉 (中等偏强)
-        '#FF69B4', // 6. 热粉
-        '#FFB6C1', // 7. 浅粉
-        '#808080', // 8. 中灰 (转弱)
-        '#A9A9A9', // 9. 深灰
-        '#C0C0C0'  // 10. 银灰 (最弱)
+        '#FF0000', // 1. 正红 (Pure Red)
+        '#FF8C00', // 2. 亮橙 (Dark Orange / Bright Orange)
+        '#0000FF', // 3. 正蓝 (Pure Blue)
+        '#9400D3', // 4. 正紫 (Dark Violet / Purple)
+        '#009900', // 5. 正绿 (Green - 稍微深一点以便在白底看清)
+        '#00CED1', // 6. 青色 (Dark Turquoise - 区别于蓝和绿)
+        '#FF1493', // 7. 深粉 (Deep Pink - 区别于红)
+        '#DAA520', // 8. 金色 (Goldenrod - 区别于橙)
+        '#8B4513', // 9. 棕色 (Saddle Brown)
+        '#708090'  // 10. 铁灰 (Slate Grey)
     ];
     
     let industryColors = {}; 
@@ -200,13 +200,11 @@
         }
     }
 
-    // 核心函数：计算排名并分配颜色
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
         lockedSeries = null;
         visibilityState = {};
         
-        // 修改处：重置颜色映射。确保每次排名变化时，第一名总是红色，最后一名总是灰色。
         industryColors = {}; 
 
         const sDate = document.getElementById('startDate').value;
@@ -224,7 +222,6 @@
             const prices = rawData.data[name];
             if (!prices || prices.length <= sIdx) return;
             
-            // 核心容错逻辑
             let startPrice = prices[sIdx];
             if (!startPrice || startPrice === 0) {
                 for(let k = sIdx; k < Math.min(prices.length, eIdx); k++) {
@@ -243,13 +240,11 @@
             }
         });
 
-        // 按收益率从高到低排序
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
-        // 修改处：强制按当前排名顺序分配颜色
         currentRankedData.forEach((item, index) => {
-            // 直接赋值，不再检查是否存在。确保 Rank 1 对应 colorPalette[0]
+            // Rank 1 用 colorPalette[0] (正红)，Rank 2 用 [1] (亮橙)，以此类推
             industryColors[item.name] = colorPalette[index % colorPalette.length];
             visibilityState[item.name] = true;
         });
@@ -293,7 +288,6 @@
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
-                    // tooltip排序也按数值大小
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
@@ -522,39 +516,4 @@
 
     function updateVisuals(targetName) {
         const newStyles = currentRankedData.map(item => {
-            const isTarget = targetName ? (item.name === targetName) : true;
-            const opacity = targetName ? (isTarget ? 1 : 0.35) : 1; 
-            const width = isTarget ? (targetName ? 4 : 2) : 1;
-            const z = isTarget ? 10 : 2;
-            return {
-                lineStyle: { opacity: opacity, width: width },
-                z: z
-            };
-        });
-        myChart.setOption({ series: newStyles });
-
-        document.querySelectorAll('.list-item').forEach(el => {
-            const name = el.dataset.name;
-            if (!visibilityState[name]) return;
-
-            if (!targetName) {
-                el.classList.remove('active-state', 'dimmed');
-            } else {
-                if (name === targetName) {
-                    el.classList.add('active-state');
-                    el.classList.remove('dimmed');
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                } else {
-                    el.classList.remove('active-state');
-                    el.classList.add('dimmed');
-                }
-            }
-        });
-    }
-
-    window.addEventListener('resize', () => myChart && myChart.resize());
-    initDate();
-    fetchData(); 
-</script>
-</body>
-</html>
+            const is
