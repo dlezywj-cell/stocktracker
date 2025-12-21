@@ -17,14 +17,26 @@
             --danger: #ff3b30;
             --radius: 12px;
         }
+        
+        /* --- 核心修改：全局滚动锁定 --- */
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* 禁止溢出 */
+            overscroll-behavior: none; /* 禁止橡皮筋效果 */
+            position: fixed; /* 强制锁定页面，防止整体拖拽 */
+        }
+
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
             background: var(--bg); color: var(--text-main); margin: 0; 
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden; 
+            display: flex; flex-direction: column; 
         }
+        
         header { 
             background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5;
             height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+            position: relative; z-index: 10;
         }
         .app-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
@@ -41,7 +53,8 @@
             gap: 10px;
             scrollbar-width: none; 
             -ms-overflow-style: none;
-            border-bottom: 1px solid #e5e5e5; /* 增加分割线感 */
+            border-bottom: 1px solid #e5e5e5; 
+            z-index: 10;
         }
         .control-panel::-webkit-scrollbar { display: none; }
 
@@ -141,12 +154,10 @@
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
-        /* --- 核心修改：手机端分屏布局 --- */
+        /* --- 核心修改：手机端分屏布局与防抖 --- */
         @media (max-width: 768px) {
-            /* 保持 body 固定，不随内容滚动 */
-            body { height: 100vh; overflow: hidden; }
             
-            /* 工作区改为垂直排列，撑满剩余高度 */
+            /* 工作区改为垂直排列 */
             .workspace { 
                 flex-direction: column; 
                 height: 100%; 
@@ -155,37 +166,37 @@
                 overflow: hidden; 
             }
             
-            /* 图表区域：固定高度（占屏幕约42%），作为上半部分 */
+            /* 图表区域：高度加大到 55vh (约55%) */
             .chart-wrapper { 
+                flex: 0 0 55vh; /* 核心修改：上半部分占比变大 */
                 height: auto;
-                flex: 0 0 42vh; /* 关键：固定占比 */
                 min-height: 250px; 
                 border-radius: 0; 
                 box-shadow: none;
                 border-bottom: 1px solid #e5e5e5;
-                z-index: 2; /* 保证图表在上方 */
+                z-index: 2; 
             }
             
-            /* 列表区域：填充剩余空间，作为下半部分 */
+            /* 列表区域：填充剩余空间 */
             .list-wrapper { 
                 width: 100%; 
-                flex: 1; /* 自动撑满剩余高度 */
+                flex: 1; 
                 height: auto; 
                 border-radius: 0; 
                 box-shadow: none; 
                 border-top: none;
                 display: flex;
                 flex-direction: column;
-                overflow: hidden; /* 防止wrapper本身滚动 */
+                overflow: hidden; 
             }
             
-            /* 只有列表主体可以滚动 */
+            /* 只有这里可以滚动，且防止滚动穿透 */
             .list-body { 
-                max-height: none; 
                 flex: 1; 
                 overflow-y: auto; 
-                padding-bottom: 20px; /* 底部留白防止遮挡 */
-                -webkit-overflow-scrolling: touch; /* iOS顺滑滚动 */
+                padding-bottom: 20px;
+                -webkit-overflow-scrolling: touch; 
+                overscroll-behavior: contain; /* 关键：防止滚动列表时带动整个页面 */
             }
         }
     </style>
@@ -236,7 +247,7 @@
     let globalAllDates = [];
     let visibilityState = {};
     
-    // 颜色高区分度逻辑：红->橙->蓝->紫->绿...
+    // 颜色高区分度逻辑
     const colorPalette = [
         '#FF0000', // 1. 正红
         '#FF8C00', // 2. 亮橙
