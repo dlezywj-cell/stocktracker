@@ -31,34 +31,31 @@
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
         
-        /* --- 核心修改：控制栏布局优化 --- */
+        /* --- 控制栏 --- */
         .control-panel {
             background: var(--bg); padding: 8px 12px; flex-shrink: 0;
             display: flex; 
             align-items: center; 
-            /* 关键：不允许换行，多余内容左右滑动(作为保底)，但我们会尽量让它不滑动 */
             flex-wrap: nowrap; 
             overflow-x: auto;
             gap: 10px;
-            /* 隐藏滚动条 */
             scrollbar-width: none; 
             -ms-overflow-style: none;
+            border-bottom: 1px solid #e5e5e5; /* 增加分割线感 */
         }
         .control-panel::-webkit-scrollbar { display: none; }
 
         .input-group { 
             display: flex; align-items: center; gap: 6px; 
             font-size: 13px; color: var(--text-sec); 
-            flex-shrink: 0; /* 防止被压缩 */
+            flex-shrink: 0; 
         }
         
-        /* 日期输入框默认样式 */
         .date-inp {
             border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
             padding: 4px 6px; border-radius: 6px; font-size: 12px; font-family: inherit;
             outline: none; text-align: center; width: 105px;
         }
-        /* 数字输入框默认样式 */
         .num-inp {
             border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
             width: 36px; text-align: center; font-size: 12px;
@@ -69,49 +66,49 @@
             flex-shrink: 0;
         }
         
-        /* --- 核心修改：针对手机端的极致压缩 --- */
+        /* --- 手机端控制栏适配 --- */
         @media (max-width: 768px) {
             .control-panel {
-                /* 缩小内边距，挤出更多空间 */
                 padding: 8px 5px; 
                 gap: 5px; 
-                justify-content: space-between; /* 两端对齐，撑满屏幕 */
+                justify-content: space-between; 
             }
             .input-group {
-                gap: 3px; /* 缩小元素间距 */
+                gap: 3px; 
             }
-            /* 隐藏“选股范围:”和“排名:”这两个文字，节省大量空间 */
             .mobile-label {
                 display: none;
             }
-            /* 稍微调小日期框宽度和字体 */
             .date-inp {
                 width: 88px; 
                 font-size: 11px;
                 padding: 4px 2px;
             }
-            /* 稍微调小数字框宽度 */
             .num-inp {
                 width: 30px;
                 padding: 4px 2px;
             }
         }
 
+        /* --- 工作区布局 (PC默认) --- */
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
+        
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; position: relative; min-width: 0;
         }
         #chart-container { width: 100%; height: 100%; }
+        
         .list-wrapper {
             width: 260px; background: var(--card); border-radius: var(--radius);
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-            display: flex; flex-direction: column; flex-shrink: 0;
+            display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
         }
         .list-header {
             padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--text-sec);
             border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between;
+            flex-shrink: 0; background: var(--card); z-index: 1;
         }
         .list-body { flex: 1; overflow-y: auto; padding: 4px 0; }
         .list-body::-webkit-scrollbar { width: 4px; }
@@ -144,12 +141,52 @@
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
+        /* --- 核心修改：手机端分屏布局 --- */
         @media (max-width: 768px) {
-            body { height: auto; overflow-y: auto; }
-            .workspace { flex-direction: column; height: auto; padding: 0; gap: 0; }
-            .chart-wrapper { height: 60vh; min-height: 350px; border-radius: 0; }
-            .list-wrapper { width: 100%; height: auto; border-radius: 0; box-shadow: none; border-top: 1px solid #eee;}
-            .list-body { max-height: 400px; }
+            /* 保持 body 固定，不随内容滚动 */
+            body { height: 100vh; overflow: hidden; }
+            
+            /* 工作区改为垂直排列，撑满剩余高度 */
+            .workspace { 
+                flex-direction: column; 
+                height: 100%; 
+                padding: 0; 
+                gap: 0; 
+                overflow: hidden; 
+            }
+            
+            /* 图表区域：固定高度（占屏幕约42%），作为上半部分 */
+            .chart-wrapper { 
+                height: auto;
+                flex: 0 0 42vh; /* 关键：固定占比 */
+                min-height: 250px; 
+                border-radius: 0; 
+                box-shadow: none;
+                border-bottom: 1px solid #e5e5e5;
+                z-index: 2; /* 保证图表在上方 */
+            }
+            
+            /* 列表区域：填充剩余空间，作为下半部分 */
+            .list-wrapper { 
+                width: 100%; 
+                flex: 1; /* 自动撑满剩余高度 */
+                height: auto; 
+                border-radius: 0; 
+                box-shadow: none; 
+                border-top: none;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden; /* 防止wrapper本身滚动 */
+            }
+            
+            /* 只有列表主体可以滚动 */
+            .list-body { 
+                max-height: none; 
+                flex: 1; 
+                overflow-y: auto; 
+                padding-bottom: 20px; /* 底部留白防止遮挡 */
+                -webkit-overflow-scrolling: touch; /* iOS顺滑滚动 */
+            }
         }
     </style>
 </head>
@@ -162,7 +199,6 @@
     </div>
 </header>
 <div class="control-panel">
-    <!-- 增加了 mobile-label 类，用于在手机端隐藏文字 -->
     <div class="input-group">
         <span class="mobile-label">选股范围:</span>
         <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
