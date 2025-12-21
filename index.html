@@ -151,23 +151,18 @@
     let globalAllDates = [];
     let visibilityState = {};
     
-    // 修改处：使用了高对比度色盘 (Tableau 10/20 style)，确保相邻线条颜色差异明显
+    // 修改处：颜色渐变逻辑 —— 红(强) -> 粉(中) -> 灰(弱)
     const colorPalette = [
-        '#1f77b4', // 深蓝
-        '#ff7f0e', // 鲜橙
-        '#2ca02c', // 翠绿
-        '#d62728', // 大红
-        '#9467bd', // 亮紫
-        '#8c564b', // 棕色
-        '#e377c2', // 粉红
-        '#7f7f7f', // 中灰
-        '#bcbd22', // 橄榄黄
-        '#17becf', // 青蓝
-        '#000000', // 纯黑
-        '#8B0000', // 深红
-        '#00008B', // 深蓝
-        '#006400', // 深绿
-        '#FF1493'  // 深粉
+        '#8B0000', // 1. 深红 (最强)
+        '#CC0000', // 2. 鲜红
+        '#FF0000', // 3. 正红
+        '#FF4500', // 4. 橙红
+        '#FF1493', // 5. 深粉 (中等偏强)
+        '#FF69B4', // 6. 热粉
+        '#FFB6C1', // 7. 浅粉
+        '#808080', // 8. 中灰 (转弱)
+        '#A9A9A9', // 9. 深灰
+        '#C0C0C0'  // 10. 银灰 (最弱)
     ];
     
     let industryColors = {}; 
@@ -205,11 +200,14 @@
         }
     }
 
-    // 核心修复函数：在初始计算排名时，使用与图表渲染完全一致的“容错逻辑”
+    // 核心函数：计算排名并分配颜色
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
         lockedSeries = null;
         visibilityState = {};
+        
+        // 修改处：重置颜色映射。确保每次排名变化时，第一名总是红色，最后一名总是灰色。
+        industryColors = {}; 
 
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
@@ -226,9 +224,8 @@
             const prices = rawData.data[name];
             if (!prices || prices.length <= sIdx) return;
             
-            // --- 核心修改开始：同步图表逻辑，寻找最近的有效起始价 ---
+            // 核心容错逻辑
             let startPrice = prices[sIdx];
-            // 如果起始价无效或为0，向后搜索最近的有效价格
             if (!startPrice || startPrice === 0) {
                 for(let k = sIdx; k < Math.min(prices.length, eIdx); k++) {
                      if(prices[k] && prices[k] !== 0) {
@@ -237,24 +234,23 @@
                      }
                 }
             }
-            // --- 核心修改结束 ---
 
             const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
             
-            // 只有找到了有效的 startPrice 才计算，防止错误淘汰
             if (startPrice && endPrice && startPrice !== 0) {
                 const pct = (endPrice - startPrice) / startPrice;
                 tempRank.push({ name: name, pct: pct, fullData: prices });
             }
         });
 
+        // 按收益率从高到低排序
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
+        // 修改处：强制按当前排名顺序分配颜色
         currentRankedData.forEach((item, index) => {
-            if (!industryColors[item.name]) {
-                industryColors[item.name] = colorPalette[index % colorPalette.length];
-            }
+            // 直接赋值，不再检查是否存在。确保 Rank 1 对应 colorPalette[0]
+            industryColors[item.name] = colorPalette[index % colorPalette.length];
             visibilityState[item.name] = true;
         });
 
@@ -297,6 +293,7 @@
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
+                    // tooltip排序也按数值大小
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
