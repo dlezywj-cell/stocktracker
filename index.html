@@ -18,13 +18,13 @@
             --radius: 12px;
         }
         
-        /* --- 核心修改：全局滚动锁定 --- */
+        /* --- 全局滚动锁定，防止页面整体晃动 --- */
         html, body {
             height: 100%;
             width: 100%;
-            overflow: hidden; /* 禁止溢出 */
-            overscroll-behavior: none; /* 禁止橡皮筋效果 */
-            position: fixed; /* 强制锁定页面，防止整体拖拽 */
+            overflow: hidden; 
+            overscroll-behavior: none; 
+            position: fixed; 
         }
 
         body { 
@@ -103,7 +103,7 @@
             }
         }
 
-        /* --- 工作区布局 (PC默认) --- */
+        /* --- 工作区布局 --- */
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
         
         .chart-wrapper {
@@ -154,10 +154,8 @@
         }
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
-        /* --- 核心修改：手机端分屏布局与防抖 --- */
+        /* --- 手机端分屏布局 --- */
         @media (max-width: 768px) {
-            
-            /* 工作区改为垂直排列 */
             .workspace { 
                 flex-direction: column; 
                 height: 100%; 
@@ -166,9 +164,9 @@
                 overflow: hidden; 
             }
             
-            /* 图表区域：高度加大到 55vh (约55%) */
+            /* 上半部分：图表占 55% */
             .chart-wrapper { 
-                flex: 0 0 55vh; /* 核心修改：上半部分占比变大 */
+                flex: 0 0 55vh; 
                 height: auto;
                 min-height: 250px; 
                 border-radius: 0; 
@@ -177,7 +175,7 @@
                 z-index: 2; 
             }
             
-            /* 列表区域：填充剩余空间 */
+            /* 下半部分：列表占剩余空间 */
             .list-wrapper { 
                 width: 100%; 
                 flex: 1; 
@@ -190,13 +188,13 @@
                 overflow: hidden; 
             }
             
-            /* 只有这里可以滚动，且防止滚动穿透 */
+            /* 仅列表内容区域可滚动 */
             .list-body { 
                 flex: 1; 
                 overflow-y: auto; 
                 padding-bottom: 20px;
                 -webkit-overflow-scrolling: touch; 
-                overscroll-behavior: contain; /* 关键：防止滚动列表时带动整个页面 */
+                overscroll-behavior: contain; 
             }
         }
     </style>
@@ -247,18 +245,9 @@
     let globalAllDates = [];
     let visibilityState = {};
     
-    // 颜色高区分度逻辑
     const colorPalette = [
-        '#FF0000', // 1. 正红
-        '#FF8C00', // 2. 亮橙
-        '#0000FF', // 3. 正蓝
-        '#9400D3', // 4. 正紫
-        '#009900', // 5. 正绿
-        '#00CED1', // 6. 青色
-        '#FF1493', // 7. 深粉
-        '#DAA520', // 8. 金色
-        '#8B4513', // 9. 棕色
-        '#708090'  // 10. 铁灰
+        '#FF0000', '#FF8C00', '#0000FF', '#9400D3', '#009900', 
+        '#00CED1', '#FF1493', '#DAA520', '#8B4513', '#708090'
     ];
     
     let industryColors = {}; 
@@ -300,7 +289,6 @@
         if (!rawData) return;
         lockedSeries = null;
         visibilityState = {};
-        
         industryColors = {}; 
 
         const sDate = document.getElementById('startDate').value;
@@ -475,6 +463,8 @@
             return { data: processedData };
         });
         
+        // 注意：这里同时更新了series数据和zoom区间
+        // 因为我们将eIdx强制为输入框的值，setOption会将图表右侧“吸附”回去
         myChart.setOption({ 
             series: newSeries,
             dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
@@ -558,20 +548,33 @@
     }
 
     function setupEvents() {
+        // --- 核心修改：缩放时锁定结束日期 ---
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
-            const startPct = opt.dataZoom[0].start;
-            const endPct = opt.dataZoom[0].end;
             
+            // 1. 获取用户缩放后的开始位置 (百分比)
+            const startPct = opt.dataZoom[0].start;
             const totalLen = globalAllDates.length;
-            const sIdx = Math.floor(totalLen * startPct / 100);
-            const eIdx = Math.ceil(totalLen * endPct / 100);
+            let sIdx = Math.floor(totalLen * startPct / 100);
 
+            // 2. 从输入框读取固定的结束日期 (Anchor Right)
+            const fixedEndDate = document.getElementById('endDate').value;
+            let eIdx = globalAllDates.findIndex(d => d > fixedEndDate);
+            if (eIdx === -1) eIdx = totalLen;
+            
+            // 防止起始日期超过结束日期
+            if (sIdx >= eIdx) sIdx = Math.max(0, eIdx - 5);
+
+            // 3. 强制执行更新：使用新的 Start + 锁定的 End
+            // updateChartAndList 内部会调用 setOption 纠正图表的显示范围
             updateChartAndList(sIdx, eIdx);
 
-            if (globalAllDates[sIdx]) document.getElementById('startDate').value = globalAllDates[sIdx];
-            const safeEndIdx = Math.min(eIdx - 1, totalLen - 1);
-            if (globalAllDates[safeEndIdx]) document.getElementById('endDate').value = globalAllDates[safeEndIdx];
+            // 4. 只更新开始日期的输入框
+            if (globalAllDates[sIdx]) {
+                document.getElementById('startDate').value = globalAllDates[sIdx];
+            }
+            
+            // 5. 不更新结束日期输入框，保持锁定
         });
 
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
