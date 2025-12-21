@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (高对比版)</title>
+    <title>行业强弱追踪 (极致单行版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -30,17 +30,35 @@
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
+        
+        /* --- 核心修改：控制栏布局优化 --- */
         .control-panel {
-            background: var(--bg); padding: 10px 16px; flex-shrink: 0;
-            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            background: var(--bg); padding: 8px 12px; flex-shrink: 0;
+            display: flex; 
+            align-items: center; 
+            /* 关键：不允许换行，多余内容左右滑动(作为保底)，但我们会尽量让它不滑动 */
+            flex-wrap: nowrap; 
+            overflow-x: auto;
+            gap: 10px;
+            /* 隐藏滚动条 */
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
         }
-        .input-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sec); }
+        .control-panel::-webkit-scrollbar { display: none; }
+
+        .input-group { 
+            display: flex; align-items: center; gap: 6px; 
+            font-size: 13px; color: var(--text-sec); 
+            flex-shrink: 0; /* 防止被压缩 */
+        }
+        
+        /* 日期输入框默认样式 */
         .date-inp {
             border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
-            padding: 4px 8px; border-radius: 6px; font-size: 12px; font-family: inherit;
+            padding: 4px 6px; border-radius: 6px; font-size: 12px; font-family: inherit;
             outline: none; text-align: center; width: 105px;
         }
+        /* 数字输入框默认样式 */
         .num-inp {
             border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
             width: 36px; text-align: center; font-size: 12px;
@@ -48,7 +66,37 @@
         .btn-icon {
             background: var(--primary); color: white; border: none; width: 28px; height: 28px;
             border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
         }
+        
+        /* --- 核心修改：针对手机端的极致压缩 --- */
+        @media (max-width: 768px) {
+            .control-panel {
+                /* 缩小内边距，挤出更多空间 */
+                padding: 8px 5px; 
+                gap: 5px; 
+                justify-content: space-between; /* 两端对齐，撑满屏幕 */
+            }
+            .input-group {
+                gap: 3px; /* 缩小元素间距 */
+            }
+            /* 隐藏“选股范围:”和“排名:”这两个文字，节省大量空间 */
+            .mobile-label {
+                display: none;
+            }
+            /* 稍微调小日期框宽度和字体 */
+            .date-inp {
+                width: 88px; 
+                font-size: 11px;
+                padding: 4px 2px;
+            }
+            /* 稍微调小数字框宽度 */
+            .num-inp {
+                width: 30px;
+                padding: 4px 2px;
+            }
+        }
+
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
@@ -114,14 +162,15 @@
     </div>
 </header>
 <div class="control-panel">
+    <!-- 增加了 mobile-label 类，用于在手机端隐藏文字 -->
     <div class="input-group">
-        <span>选股范围:</span>
+        <span class="mobile-label">选股范围:</span>
         <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
         <span>-</span>
         <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
     </div>
-    <div class="input-group" style="margin-left: auto;">
-        <span>排名:</span>
+    <div class="input-group">
+        <span class="mobile-label">排名:</span>
         <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
         <span>-</span>
         <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
@@ -151,18 +200,18 @@
     let globalAllDates = [];
     let visibilityState = {};
     
-    // 修改处：颜色高区分度逻辑 —— 严格按照您的要求：红->橙->蓝->紫->绿...
+    // 颜色高区分度逻辑：红->橙->蓝->紫->绿...
     const colorPalette = [
-        '#FF0000', // 1. 正红 (Pure Red)
-        '#FF8C00', // 2. 亮橙 (Dark Orange / Bright Orange)
-        '#0000FF', // 3. 正蓝 (Pure Blue)
-        '#9400D3', // 4. 正紫 (Dark Violet / Purple)
-        '#009900', // 5. 正绿 (Green - 稍微深一点以便在白底看清)
-        '#00CED1', // 6. 青色 (Dark Turquoise - 区别于蓝和绿)
-        '#FF1493', // 7. 深粉 (Deep Pink - 区别于红)
-        '#DAA520', // 8. 金色 (Goldenrod - 区别于橙)
-        '#8B4513', // 9. 棕色 (Saddle Brown)
-        '#708090'  // 10. 铁灰 (Slate Grey)
+        '#FF0000', // 1. 正红
+        '#FF8C00', // 2. 亮橙
+        '#0000FF', // 3. 正蓝
+        '#9400D3', // 4. 正紫
+        '#009900', // 5. 正绿
+        '#00CED1', // 6. 青色
+        '#FF1493', // 7. 深粉
+        '#DAA520', // 8. 金色
+        '#8B4513', // 9. 棕色
+        '#708090'  // 10. 铁灰
     ];
     
     let industryColors = {}; 
@@ -244,7 +293,6 @@
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
         currentRankedData.forEach((item, index) => {
-            // Rank 1 用 colorPalette[0] (正红)，Rank 2 用 [1] (亮橙)，以此类推
             industryColors[item.name] = colorPalette[index % colorPalette.length];
             visibilityState[item.name] = true;
         });
