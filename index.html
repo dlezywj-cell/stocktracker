@@ -16,9 +16,11 @@
             --success: #34c759;
             --danger: #ff3b30;
             --radius: 12px;
+            /* 新增表头背景色，浅灰蓝，既护眼又能分割 */
+            --header-bg: #f2f4f8; 
         }
         
-        /* --- 全局滚动锁定，防止页面整体晃动 --- */
+        /* --- 全局滚动锁定 --- */
         html, body {
             height: 100%;
             width: 100%;
@@ -118,18 +120,34 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
         }
+
+        /* --- 核心修改：表头样式增强 --- */
         .list-header {
-            padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--text-sec);
-            border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between;
-            flex-shrink: 0; background: var(--card); z-index: 1;
+            padding: 12px 16px; /* 增加一点内边距 */
+            font-size: 13px; 
+            font-weight: 700; /* 加粗 */
+            color: var(--text-main); /* 颜色加深 */
+            
+            /* 背景高亮设计 */
+            background: var(--header-bg); 
+            
+            /* 上下边框增强分割感 */
+            border-top: 1px solid #e5e5e5;
+            border-bottom: 1px solid #dcdcdc; 
+            
+            display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; z-index: 1;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02); /* 微弱阴影 */
         }
-        .list-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+        .list-body { flex: 1; overflow-y: auto; padding: 4px 0; background: var(--card); }
         .list-body::-webkit-scrollbar { width: 4px; }
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
         
         .list-item {
-            padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; cursor: pointer; border-bottom: 1px solid transparent;
+            padding: 10px 16px; /* 列表项稍微加宽一点内边距，为了美观 */
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; /* 列表间微弱分割线 */
             transition: transform 0.2s, background 0.2s, opacity 0.2s; 
             opacity: 1;
         }
@@ -171,7 +189,8 @@
                 min-height: 250px; 
                 border-radius: 0; 
                 box-shadow: none;
-                border-bottom: 1px solid #e5e5e5;
+                /* 图表底部边框去掉，交由表头顶部边框来处理分割 */
+                border-bottom: none; 
                 z-index: 2; 
             }
             
@@ -188,7 +207,14 @@
                 overflow: hidden; 
             }
             
-            /* 仅列表内容区域可滚动 */
+            /* 表头在手机端看起来更像一个分割条 */
+            .list-header {
+                font-size: 12px;
+                padding: 8px 12px;
+                background: #f0f2f5; /* 手机端背景稍微深一点，区分更明显 */
+                border-top: 1px solid #dcdcdc; /* 明显的顶部分割线 */
+            }
+
             .list-body { 
                 flex: 1; 
                 overflow-y: auto; 
@@ -230,7 +256,7 @@
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#999;font-size:10px;">(动态排序)</span>
+            <span style="font-weight:normal;color:#888;font-size:10px;margin-left:4px;">(按涨幅排序)</span>
             <span>区间收益率</span>
         </div>
         <div class="list-body" id="rankList"></div>
@@ -463,8 +489,7 @@
             return { data: processedData };
         });
         
-        // 注意：这里同时更新了series数据和zoom区间
-        // 因为我们将eIdx强制为输入框的值，setOption会将图表右侧“吸附”回去
+        // 核心：强制锁定结束日期逻辑
         myChart.setOption({ 
             series: newSeries,
             dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
@@ -548,33 +573,25 @@
     }
 
     function setupEvents() {
-        // --- 核心修改：缩放时锁定结束日期 ---
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
             
-            // 1. 获取用户缩放后的开始位置 (百分比)
+            // 锁定结束日期的核心逻辑
             const startPct = opt.dataZoom[0].start;
             const totalLen = globalAllDates.length;
             let sIdx = Math.floor(totalLen * startPct / 100);
 
-            // 2. 从输入框读取固定的结束日期 (Anchor Right)
             const fixedEndDate = document.getElementById('endDate').value;
             let eIdx = globalAllDates.findIndex(d => d > fixedEndDate);
             if (eIdx === -1) eIdx = totalLen;
             
-            // 防止起始日期超过结束日期
             if (sIdx >= eIdx) sIdx = Math.max(0, eIdx - 5);
 
-            // 3. 强制执行更新：使用新的 Start + 锁定的 End
-            // updateChartAndList 内部会调用 setOption 纠正图表的显示范围
             updateChartAndList(sIdx, eIdx);
 
-            // 4. 只更新开始日期的输入框
             if (globalAllDates[sIdx]) {
                 document.getElementById('startDate').value = globalAllDates[sIdx];
             }
-            
-            // 5. 不更新结束日期输入框，保持锁定
         });
 
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
