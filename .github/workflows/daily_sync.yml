@@ -2,16 +2,15 @@ name: Update Stock Data
 
 on:
   schedule:
-    # 北京时间 16:00 对应 UTC 时间 08:00
-    # 周一到周五运行
-    - cron: '0 8 * * 1-5'
+    # 北京时间 16:17 (UTC 08:17)
+    # 避开高峰，保证能运行
+    - cron: '17 8 * * 1-5'
     
-  workflow_dispatch: # 手动触发按钮
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 这一步非常重要，赋予脚本写入仓库的权限
     permissions:
       contents: write
 
@@ -23,7 +22,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-        cache: 'pip' # 开启缓存，下次运行安装库会快很多
+        # 这里删除了 cache: 'pip'，修复了你的报错
 
     - name: Install dependencies
       run: |
@@ -31,22 +30,13 @@ jobs:
         pip install akshare pandas requests
 
     - name: Run data fetch script
-      # 设置时区为上海，这样脚本里的 datetime.now() 就会显示下午 16:00 而不是早上 08:00
       env:
         TZ: Asia/Shanghai
       run: python update_data.py
 
     - name: Commit and Push changes
       run: |
-        # 配置 git 用户信息
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
-        
-        # 添加生成的数据文件（这里假设是 industry_data.json，如果是其他名字请修改）
         git add .
-        
-        # 只有当数据有变化时才提交
-        # 获取当前时间用于 Commit 信息
-        current_time=$(date "+%Y-%m-%d %H:%M:%S")
-        
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update: $current_time" && git push)
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update: $(date +'%Y-%m-%d')" && git push)
