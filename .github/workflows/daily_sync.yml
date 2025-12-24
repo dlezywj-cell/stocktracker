@@ -3,7 +3,6 @@ name: Update Stock Data
 on:
   schedule:
     # 北京时间 16:00 (UTC 08:00)
-    # 也就是每天下午收盘后运行
     - cron: '0 8 * * 1-5'
     
   workflow_dispatch:
@@ -17,6 +16,8 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 关键：下载完整历史记录，防止合并出错
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -37,13 +38,24 @@ jobs:
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
+        
+        # 将所有变动加入暂存区
         git add .
-        # 检查是否有文件变动
+        
+        # 检查是否有变动
         if ! git diff --quiet && ! git diff --staged --quiet; then
+          echo "Detected changes, preparing to commit..."
+          
           git commit -m "Auto update: $(date +'%Y-%m-%d')"
-          # === 关键修改：先拉取远程最新代码(变基)，再推送，防止报错 ===
-          git pull --rebase
-          git push
+          
+          # === 核心修复步骤 ===
+          # 1. 拉取远程最新代码并变基（合并你的修改和远程的修改）
+          git pull --rebase origin main
+          
+          # 2. 推送
+          git push origin main
+          
+          echo "Changes pushed successfully."
         else
-          echo "No changes to commit"
+          echo "No changes to commit."
         fi
