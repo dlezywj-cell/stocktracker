@@ -1,40 +1,4 @@
-name: Update Stock Data
-
-on:
-  schedule:
-    # 北京时间 16:00 (UTC 08:00)
-    - cron: '0 8 * * 1-5'
-    
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # 关键：下载完整历史记录，防止合并出错
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install akshare pandas requests
-
-    - name: Run data fetch script
-      env:
-        TZ: Asia/Shanghai
-      run: python update_data.py
-
-    - name: Commit and Push changes
+- name: Commit and Push changes
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
@@ -42,17 +6,17 @@ jobs:
         # 将所有变动加入暂存区
         git add .
         
-        # 检查是否有变动
-        if ! git diff --quiet && ! git diff --staged --quiet; then
-          echo "Detected changes, preparing to commit..."
+        # === 修正后的判断逻辑 ===
+        # 只要暂存区(staged)有变化，就执行提交
+        if ! git diff --staged --quiet; then
+          echo "Detected changes..."
           
           git commit -m "Auto update: $(date +'%Y-%m-%d')"
           
-          # === 核心修复步骤 ===
-          # 1. 拉取远程最新代码并变基（合并你的修改和远程的修改）
+          # 拉取最新代码并合并
           git pull --rebase origin main
           
-          # 2. 推送
+          # 推送
           git push origin main
           
           echo "Changes pushed successfully."
