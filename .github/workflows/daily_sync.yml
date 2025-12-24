@@ -4,7 +4,7 @@ on:
   schedule:
     # 北京时间 16:17 (UTC 08:17)
     # 避开高峰，保证能运行
-    - cron: '17 8 * * 1-5'
+    - cron: '0 8 * * 1-5'
     
   workflow_dispatch:
 
