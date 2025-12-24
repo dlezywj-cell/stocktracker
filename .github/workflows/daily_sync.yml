@@ -2,8 +2,8 @@ name: Update Stock Data
 
 on:
   schedule:
-    # 北京时间 16:17 (UTC 08:17)
-    # 避开高峰，保证能运行
+    # 北京时间 16:00 (UTC 08:00)
+    # 也就是每天下午收盘后运行
     - cron: '0 8 * * 1-5'
     
   workflow_dispatch:
@@ -22,7 +22,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-        # 这里删除了 cache: 'pip'，修复了你的报错
 
     - name: Install dependencies
       run: |
@@ -39,4 +38,12 @@ jobs:
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
         git add .
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update: $(date +'%Y-%m-%d')" && git push)
+        # 检查是否有文件变动
+        if ! git diff --quiet && ! git diff --staged --quiet; then
+          git commit -m "Auto update: $(date +'%Y-%m-%d')"
+          # === 关键修改：先拉取远程最新代码(变基)，再推送，防止报错 ===
+          git pull --rebase
+          git push
+        else
+          echo "No changes to commit"
+        fi
