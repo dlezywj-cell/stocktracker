@@ -1,25 +1,60 @@
-- name: Commit and Push changes
+name: Update Stock Data
+
+on:
+  schedule:
+    # 北京时间 16:00 (UTC 08:00)
+    - cron: '0 8 * * 1-5'
+    
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 下载完整历史，避免 git pull 报错
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install akshare pandas requests
+
+    - name: Run data fetch script
+      env:
+        TZ: Asia/Shanghai
+      run: python update_data.py
+
+    - name: Commit and Push changes
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
         
-        # 将所有变动加入暂存区
+        # 1. 把所有文件加入暂存区
         git add .
         
-        # === 修正后的判断逻辑 ===
-        # 只要暂存区(staged)有变化，就执行提交
+        # 2. 判断暂存区是否有变化 (这是修复 No changes 的关键)
         if ! git diff --staged --quiet; then
-          echo "Detected changes..."
+          echo "检测到数据变化，准备提交..."
           
           git commit -m "Auto update: $(date +'%Y-%m-%d')"
           
-          # 拉取最新代码并合并
+          # 3. 拉取并合并 (修复 rejected 报错)
           git pull --rebase origin main
           
-          # 推送
+          # 4. 推送
           git push origin main
           
-          echo "Changes pushed successfully."
+          echo "推送成功！"
         else
-          echo "No changes to commit."
+          echo "没有检测到数据变化 (No changes to commit)."
         fi
