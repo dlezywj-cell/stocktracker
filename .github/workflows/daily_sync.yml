@@ -2,8 +2,9 @@ name: Update Stock Data
 
 on:
   schedule:
-    # 北京时间 16:00 (UTC 08:00)
-    - cron: '0 8 * * 1-5'
+    # 北京时间 17:00 (UTC 09:00)
+    # 延后一小时，确保收盘数据已更新
+    - cron: '0 9 * * 1-5'
     
   workflow_dispatch:
 
@@ -42,7 +43,7 @@ jobs:
         # 1. 把所有文件加入暂存区
         git add .
         
-        # 2. 判断暂存区是否有变化 (这是修复 No changes 的关键)
+        # 2. 判断暂存区是否有变化
         if ! git diff --staged --quiet; then
           echo "检测到数据变化，准备提交..."
           
