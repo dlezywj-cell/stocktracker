@@ -2,9 +2,9 @@ name: Update Stock Data
 
 on:
   schedule:
-    # 北京时间 17:00 (UTC 09:00)
-    # 延后一小时，确保收盘数据已更新
-    - cron: '0 9 * * 1-5'
+    # 北京时间 20:30 对应 UTC 时间 12:30
+    # 这个时间点，所有财经数据接口肯定都更新完当天的日线了
+    - cron: '30 12 * * 1-5'
     
   workflow_dispatch:
 
