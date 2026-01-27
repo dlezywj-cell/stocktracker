@@ -108,6 +108,39 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; position: relative; min-width: 0;
         }
+        
+        /* --- 新增样式：顶部标签容器 --- */
+        .chart-tags-container {
+            position: absolute;
+            top: 10px;
+            left: 55px; /* 避开左侧刻度 */
+            right: 20px;
+            height: auto;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            pointer-events: none; /* 让鼠标穿透，不影响图表操作 */
+            z-index: 5;
+        }
+
+        .chart-tag-chip {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e5e5e5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            pointer-events: auto; /* 标签本身可以响应点击(虽然这里没加点击事件) */
+        }
+        /* --------------------------- */
+
         #chart-container { width: 100%; height: 100%; }
         
         .list-wrapper {
@@ -178,6 +211,13 @@
                 border-bottom: none; 
                 z-index: 2; 
             }
+            
+            .chart-tags-container {
+                left: 10px;
+                top: 5px;
+                font-size: 11px;
+            }
+
             .list-wrapper { 
                 width: 100%; 
                 flex: 1; 
@@ -230,6 +270,9 @@
 </div>
 <div class="workspace">
     <div class="chart-wrapper">
+        <!-- 标签显示层 -->
+        <div id="chart-tags" class="chart-tags-container"></div>
+
         <div class="loading-mask" id="loader"><span><i class="fas fa-spinner fa-spin"></i> 数据加载中...</span></div>
         <div id="chart-container"></div>
     </div>
@@ -246,13 +289,11 @@
 <script>
     let rawData = null; 
     let myChart = null;
-    
-    // --- 修改点：使用Set来支持多选 ---
     let selectedSeries = new Set();
-    
     let currentRankedData = []; 
     let globalAllDates = [];
     let visibilityState = {};
+    let currentViewData = []; // 用于存储当前视野下的数据，供标签使用
     
     const colorPalette = [
         '#FF0000', '#FF8C00', '#0000FF', '#9400D3', '#009900', 
@@ -296,10 +337,12 @@
 
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
-        // 每次重新计算排名时，清空选择，防止逻辑错乱
         selectedSeries.clear();
         visibilityState = {};
         industryColors = {}; 
+        
+        // 任何时候重新计算排名都清空标签
+        document.getElementById('chart-tags').innerHTML = '';
 
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
@@ -373,8 +416,8 @@
 
         const option = {
             animation: false, 
-            // --- 修改点：Grid顶部空间加大，底部空间减小 ---
-            grid: { left: '45', right: '20', bottom: '30', top: '50', containLabel: false },
+            // 调整 Grid Top，为标签留出空间
+            grid: { left: '45', right: '20', bottom: '30', top: '55', containLabel: false },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
@@ -385,7 +428,6 @@
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
-                        // --- 修改点：Tooltip配合多选逻辑变暗 ---
                         const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
                         
                         const textColor = isDimmed ? '#999' : '#333';
@@ -418,7 +460,6 @@
                     type: 'slider',
                     show: true,
                     xAxisIndex: 0,
-                    // --- 修改点：Move Bar to Top ---
                     top: 5,
                     bottom: undefined, 
                     height: 20,
@@ -497,10 +538,13 @@
             };
         });
 
+        // 存储当前数据，供顶部标签使用
+        currentViewData = sortedList;
+
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
         
-        // 保持选择状态
+        // 如果有选中项，刷新视觉效果（和标签数值）
         if (selectedSeries.size > 0) {
             updateVisuals(null);
         }
@@ -523,7 +567,6 @@
             if (!visibilityState[item.name]) {
                 itemClass += ' unchecked';
             } else if (selectedSeries.size > 0) {
-                // --- 修改点：列表渲染配合多选 ---
                 if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -552,7 +595,6 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
-        // 如果取消可见性，同时从高亮集合中移除
         if (!visibilityState[name] && selectedSeries.has(name)) {
             selectedSeries.delete(name);
             updateVisuals(null); 
@@ -599,7 +641,6 @@
 
     function applyHighlight(targetName) {
         if (!visibilityState[targetName]) return;
-        // --- 修改点：如果有选中项，禁用悬停高亮，保持选中状态 ---
         if (selectedSeries.size > 0) return; 
         updateVisuals(targetName);
     }
@@ -609,48 +650,82 @@
         updateVisuals(null); 
     }
     
-    // --- 修改点：切换多选逻辑 ---
     function toggleLock(targetName) {
         if (targetName && !visibilityState[targetName]) return;
         
         if (targetName === null) {
-            // 点击背景，清空所有选择
             selectedSeries.clear();
         } else {
             if (selectedSeries.has(targetName)) {
-                // 如果已存在，则移除（取消选中）
                 selectedSeries.delete(targetName);
             } else {
-                // 如果不存在，则添加（多选）
                 selectedSeries.add(targetName);
             }
         }
         updateVisuals(null); 
     }
 
-    // --- 修改点：视觉更新函数适配多选逻辑 ---
     function updateVisuals(hoverName) {
         const hasSelection = selectedSeries.size > 0;
+        const tagContainer = document.getElementById('chart-tags');
+        
+        // 1. 生成顶部 HTML 标签
+        let tagsHtml = '';
+        if (hasSelection) {
+            selectedSeries.forEach(name => {
+                const dataItem = currentViewData.find(d => d.name === name);
+                const color = industryColors[name];
+                
+                let valStr = '--';
+                let valColor = '#fff';
+                let valBg = color;
 
+                if (dataItem && dataItem.currentPct !== -999) {
+                    valStr = ((dataItem.currentPct) * 100).toFixed(2) + '%';
+                    const sign = dataItem.currentPct >= 0 ? '+' : '';
+                    valStr = sign + valStr;
+                }
+
+                // 生成标签 HTML
+                tagsHtml += `
+                    <div class="chart-tag-chip" style="border-color:${color}; color:${color}">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
+                        <span>${name}</span>
+                        <span style="background:${valBg};color:${valColor};padding:0 4px;border-radius:3px;font-size:11px;margin-left:2px;">${valStr}</span>
+                    </div>
+                `;
+            });
+        }
+        tagContainer.innerHTML = tagsHtml;
+
+        // 2. 更新图表线条样式 (确保 endLabel 不显示)
         const newStyles = currentRankedData.map(item => {
-            // 判断是否应该高亮
             let isHighlighted = false;
             
             if (hasSelection) {
-                // 如果有选中项，只高亮Set里的
                 isHighlighted = selectedSeries.has(item.name);
             } else if (hoverName) {
-                // 如果没选中项但有鼠标悬停，高亮悬停的
                 isHighlighted = item.name === hoverName;
             } else {
-                // 都没有，显示默认状态（全不透明）
-                return { lineStyle: { opacity: 1, width: 2 }, z: 2 };
+                return { 
+                    lineStyle: { opacity: 0.15, width: 1 }, 
+                    z: 2,
+                    endLabel: { show: false }
+                };
             }
 
             if (isHighlighted) {
-                return { lineStyle: { opacity: 1, width: 4 }, z: 10 };
+                return { 
+                    lineStyle: { opacity: 1, width: 3 }, 
+                    z: 10,
+                    endLabel: { show: false } 
+                };
             } else {
-                return { lineStyle: { opacity: 0.35, width: 1 }, z: 2 };
+                return { 
+                    lineStyle: { opacity: 0.15, width: 1 }, 
+                    z: 2,
+                    endLabel: { show: false } 
+                };
             }
         });
         
