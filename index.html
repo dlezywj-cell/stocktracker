@@ -295,12 +295,47 @@
     let visibilityState = {};
     let currentViewData = []; // 用于存储当前视野下的数据，供标签使用
     
+    // -------------------------------------------------------------------------
+    // 核心修改：使用高对比度色表，并支持动态分配
+    // -------------------------------------------------------------------------
     const colorPalette = [
-        '#FF0000', '#FF8C00', '#0000FF', '#9400D3', '#009900', 
-        '#00CED1', '#FF1493', '#DAA520', '#8B4513', '#708090'
+        '#FF3030', // 红
+        '#007AFF', // 蓝 (红蓝对比)
+        '#00C040', // 绿 (三原色)
+        '#FFD700', // 金黄 (亮色)
+        '#9C27B0', // 紫
+        '#00CED1', // 青
+        '#FF9500', // 橙
+        '#FF1493', // 深粉
+        '#8B4513', // 棕
+        '#708090', // 灰
+        '#000000', // 黑
+        '#ADFF2F', // 绿黄
+        '#4B0082', // 靛青
+        '#FF4500', // 红橙
+        '#2E8B57', // 海藻绿
+        '#800000', // 栗色
+        '#4682B4', // 钢蓝
+        '#D2691E', // 巧克力
+        '#000080', // 深蓝
+        '#DC143C'  // 猩红
     ];
     
     let industryColors = {}; 
+
+    // 新增函数：根据当前“可见”的曲线，重新分配颜色
+    // 确保无论选中哪几个，都优先使用最鲜艳的对比色
+    function reassignColors() {
+        let visibleCount = 0;
+        currentRankedData.forEach(item => {
+            if (visibilityState[item.name]) {
+                industryColors[item.name] = colorPalette[visibleCount % colorPalette.length];
+                visibleCount++;
+            } else {
+                industryColors[item.name] = '#cccccc'; // 隐藏时用淡灰
+            }
+        });
+    }
 
     function initDate() {
         const end = new Date();
@@ -341,7 +376,6 @@
         visibilityState = {};
         industryColors = {}; 
         
-        // 任何时候重新计算排名都清空标签
         document.getElementById('chart-tags').innerHTML = '';
 
         const sDate = document.getElementById('startDate').value;
@@ -380,10 +414,13 @@
         tempRank.sort((a, b) => b.pct - a.pct);
         currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
-        currentRankedData.forEach((item, index) => {
-            industryColors[item.name] = colorPalette[index % colorPalette.length];
+        // 初始化可见性
+        currentRankedData.forEach((item) => {
             visibilityState[item.name] = true;
         });
+
+        // 核心：应用动态颜色分配
+        reassignColors();
 
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
@@ -400,11 +437,11 @@
             smooth: true,
             showSymbol: false, 
             triggerLineEvent: true,
-            lineStyle: { width: 2 },
+            lineStyle: { width: 2, color: industryColors[item.name] }, // 显式指定颜色
             data: visibilityState[item.name] ? item.fullData : [], 
             emphasis: { disabled: true },
             z: 2,
-            itemStyle: { color: industryColors[item.name] }
+            itemStyle: { color: industryColors[item.name] } // 显式指定颜色
         }));
 
         let startPercent = 0;
@@ -416,7 +453,6 @@
 
         const option = {
             animation: false, 
-            // 调整 Grid Top，为标签留出空间
             grid: { left: '45', right: '20', bottom: '30', top: '55', containLabel: false },
             tooltip: {
                 trigger: 'axis',
@@ -516,7 +552,12 @@
                 return parseFloat((p / basePrice).toFixed(4));
             });
             
-            return { data: processedData };
+            // 核心修改：更新数据时，同时强制更新颜色
+            return { 
+                data: processedData,
+                itemStyle: { color: industryColors[item.name] },
+                lineStyle: { color: industryColors[item.name] }
+            };
         });
         
         myChart.setOption({ 
@@ -538,13 +579,10 @@
             };
         });
 
-        // 存储当前数据，供顶部标签使用
         currentViewData = sortedList;
-
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
         
-        // 如果有选中项，刷新视觉效果（和标签数值）
         if (selectedSeries.size > 0) {
             updateVisuals(null);
         }
@@ -595,10 +633,15 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
+        
         if (!visibilityState[name] && selectedSeries.has(name)) {
             selectedSeries.delete(name);
             updateVisuals(null); 
         }
+
+        // 核心：每次勾选/取消，都重新分配颜色，保证可见线条对比度最大
+        reassignColors();
+
         const opt = myChart.getOption();
         const startValue = opt.dataZoom[0].startValue;
         const endValue = opt.dataZoom[0].endValue;
@@ -708,7 +751,7 @@
                 isHighlighted = item.name === hoverName;
             } else {
                 return { 
-                    lineStyle: { opacity: 0.15, width: 1 }, 
+                    lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
                     z: 2,
                     endLabel: { show: false }
                 };
@@ -716,13 +759,13 @@
 
             if (isHighlighted) {
                 return { 
-                    lineStyle: { opacity: 1, width: 3 }, 
+                    lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, 
                     z: 10,
                     endLabel: { show: false } 
                 };
             } else {
                 return { 
-                    lineStyle: { opacity: 0.15, width: 1 }, 
+                    lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
                     z: 2,
                     endLabel: { show: false } 
                 };
