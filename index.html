@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (极致单行版)</title>
+    <title>行业强弱追踪 (Pro版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -20,17 +20,12 @@
         }
         
         html, body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden; 
-            overscroll-behavior: none; 
-            position: fixed; 
+            height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; position: fixed; 
         }
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
-            background: var(--bg); color: var(--text-main); margin: 0; 
-            display: flex; flex-direction: column; 
+            background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; 
         }
         
         header { 
@@ -43,25 +38,41 @@
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
         
+        /* 设置按钮 */
+        .header-btn {
+            background: none; border: none; color: var(--text-sec); cursor: pointer; font-size: 16px; margin-left: 10px; padding: 5px;
+        }
+        .header-btn:hover { color: var(--primary); }
+
         .control-panel {
             background: var(--bg); padding: 8px 12px; flex-shrink: 0;
-            display: flex; 
-            align-items: center; 
-            flex-wrap: nowrap; 
-            overflow-x: auto;
-            gap: 10px;
-            scrollbar-width: none; 
-            -ms-overflow-style: none;
-            border-bottom: 1px solid #e5e5e5; 
-            z-index: 10;
+            display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #e5e5e5; z-index: 10;
         }
-        .control-panel::-webkit-scrollbar { display: none; }
+        
+        .control-row-top {
+            display: flex; align-items: center; flex-wrap: nowrap; overflow-x: auto; gap: 10px;
+            scrollbar-width: none; -ms-overflow-style: none; width: 100%;
+        }
+        .control-row-top::-webkit-scrollbar { display: none; }
+
+        .group-scroll-container {
+            display: flex; gap: 8px; overflow-x: auto; width: 100%; padding-bottom: 2px;
+            scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .group-scroll-container::-webkit-scrollbar { display: none; }
+
+        .group-chip {
+            padding: 4px 10px; border-radius: 14px; font-size: 12px; background: #fff; color: var(--text-sec);
+            border: 1px solid #e5e5e5; white-space: nowrap; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+        }
+        .group-chip.active {
+            background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 500;
+        }
 
         .input-group { 
-            display: flex; align-items: center; gap: 6px; 
-            font-size: 13px; color: var(--text-sec); 
-            flex-shrink: 0; 
+            display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; 
         }
+        .input-group.disabled { opacity: 0.4; pointer-events: none; }
         
         .date-inp {
             border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
@@ -78,87 +89,54 @@
             flex-shrink: 0;
         }
         
+        /* 保存按钮 - 默认隐藏 */
+        .btn-save {
+            background: var(--success); color: white; border: none; padding: 0 12px; height: 28px;
+            border-radius: 14px; cursor: pointer; display: none; align-items: center; gap: 6px; font-size: 12px;
+            flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 500;
+        }
+        .btn-save:active { opacity: 0.8; transform: scale(0.98); }
+
         @media (max-width: 768px) {
-            .control-panel {
-                padding: 8px 5px; 
-                gap: 5px; 
-                justify-content: space-between; 
-            }
-            .input-group {
-                gap: 3px; 
-            }
-            .mobile-label {
-                display: none;
-            }
-            .date-inp {
-                width: 88px; 
-                font-size: 11px;
-                padding: 4px 2px;
-            }
-            .num-inp {
-                width: 30px;
-                padding: 4px 2px;
-            }
+            .control-panel { padding: 8px 5px; gap: 6px; }
+            .control-row-top { justify-content: space-between; gap: 5px; }
+            .input-group { gap: 3px; }
+            .mobile-label { display: none; }
+            .date-inp { width: 88px; font-size: 11px; padding: 4px 2px; }
+            .num-inp { width: 30px; padding: 4px 2px; }
         }
 
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
         
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-            display: flex; flex-direction: column; position: relative; min-width: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; position: relative; min-width: 0;
         }
         
-        /* --- 新增样式：顶部标签容器 --- */
         .chart-tags-container {
-            position: absolute;
-            top: 10px;
-            left: 55px; /* 避开左侧刻度 */
-            right: 20px;
-            height: auto;
-            min-height: 30px;
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            pointer-events: none; /* 让鼠标穿透，不影响图表操作 */
-            z-index: 5;
+            position: absolute; top: 10px; left: 55px; right: 20px;
+            height: auto; min-height: 30px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+            pointer-events: none; z-index: 5;
         }
 
         .chart-tag-chip {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid #e5e5e5;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: all 0.2s;
-            pointer-events: auto; /* 标签本身可以响应点击(虽然这里没加点击事件) */
+            background: rgba(255, 255, 255, 0.95); border: 1px solid #e5e5e5;
+            padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: all 0.2s; pointer-events: auto;
         }
-        /* --------------------------- */
 
         #chart-container { width: 100%; height: 100%; }
         
         .list-wrapper {
             width: 260px; background: var(--card); border-radius: var(--radius);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-            display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
         }
 
         .list-header {
-            padding: 12px 16px; 
-            font-size: 13px; 
-            font-weight: 700; 
-            color: var(--text-main);
-            background: var(--header-bg); 
-            border-top: 1px solid #e5e5e5;
-            border-bottom: 1px solid #dcdcdc; 
-            display: flex; justify-content: space-between; align-items: center;
-            flex-shrink: 0; z-index: 1;
+            padding: 12px 16px; font-size: 13px; font-weight: 700; color: var(--text-main);
+            background: var(--header-bg); border-top: 1px solid #e5e5e5; border-bottom: 1px solid #dcdcdc; 
+            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 1;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
 
@@ -167,11 +145,9 @@
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
         
         .list-item {
-            padding: 10px 16px; 
-            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; 
-            transition: transform 0.2s, background 0.2s, opacity 0.2s; 
-            opacity: 1;
+            transition: transform 0.2s, background 0.2s, opacity 0.2s; opacity: 1;
         }
         .list-item:hover { background: #f9f9f9; }
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
@@ -195,53 +171,12 @@
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
         @media (max-width: 768px) {
-            .workspace { 
-                flex-direction: column; 
-                height: 100%; 
-                padding: 0; 
-                gap: 0; 
-                overflow: hidden; 
-            }
-            .chart-wrapper { 
-                flex: 0 0 55vh; 
-                height: auto;
-                min-height: 250px; 
-                border-radius: 0; 
-                box-shadow: none;
-                border-bottom: none; 
-                z-index: 2; 
-            }
-            
-            .chart-tags-container {
-                left: 10px;
-                top: 5px;
-                font-size: 11px;
-            }
-
-            .list-wrapper { 
-                width: 100%; 
-                flex: 1; 
-                height: auto; 
-                border-radius: 0; 
-                box-shadow: none; 
-                border-top: none;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden; 
-            }
-            .list-header {
-                font-size: 12px;
-                padding: 8px 12px;
-                background: #f0f2f5; 
-                border-top: 1px solid #dcdcdc; 
-            }
-            .list-body { 
-                flex: 1; 
-                overflow-y: auto; 
-                padding-bottom: 20px;
-                -webkit-overflow-scrolling: touch; 
-                overscroll-behavior: contain; 
-            }
+            .workspace { flex-direction: column; height: 100%; padding: 0; gap: 0; overflow: hidden; }
+            .chart-wrapper { flex: 0 0 55vh; height: auto; min-height: 250px; border-radius: 0; box-shadow: none; border-bottom: none; z-index: 2; }
+            .chart-tags-container { left: 10px; top: 5px; font-size: 11px; }
+            .list-wrapper { width: 100%; flex: 1; height: auto; border-radius: 0; box-shadow: none; border-top: none; display: flex; flex-direction: column; overflow: hidden; }
+            .list-header { font-size: 12px; padding: 8px 12px; background: #f0f2f5; border-top: 1px solid #dcdcdc; }
+            .list-body { flex: 1; overflow-y: auto; padding-bottom: 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         }
     </style>
 </head>
@@ -251,28 +186,45 @@
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
+        <button class="header-btn" onclick="manageToken()" title="GitHub Token 设置"><i class="fas fa-cog"></i></button>
     </div>
 </header>
 <div class="control-panel">
-    <div class="input-group">
-        <span class="mobile-label">选股范围:</span>
-        <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
-        <span>-</span>
-        <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
-    </div>
-    <div class="input-group">
-        <span class="mobile-label">排名:</span>
-        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
-        <span>-</span>
-        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
+    <!-- 第一行：日期与排名 -->
+    <div class="control-row-top">
+        <div class="input-group">
+            <span class="mobile-label">选股范围:</span>
+            <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
+            <span>-</span>
+            <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
+        </div>
+        
+        <!-- 排名输入框 -->
+        <div class="input-group" id="ranking-inputs">
+            <span class="mobile-label">排名:</span>
+            <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
+            <span>-</span>
+            <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
+        </div>
+
+        <!-- 刷新按钮 -->
         <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
+        
+        <!-- 保存板块按钮 (只有选中时才显示) -->
+        <button id="saveGroupBtn" class="btn-save" onclick="saveCurrentSelection()">
+            <i class="fas fa-save"></i> 保存为板块
+        </button>
+    </div>
+    
+    <!-- 第二行：板块选择（动态生成） -->
+    <div class="group-scroll-container" id="group-tabs">
+        <div class="group-chip active" onclick="switchGroup(null, this)">🏆 涨幅排名</div>
+        <!-- 其他板块将通过JS动态加载 -->
     </div>
 </div>
 <div class="workspace">
     <div class="chart-wrapper">
-        <!-- 标签显示层 -->
         <div id="chart-tags" class="chart-tags-container"></div>
-
         <div class="loading-mask" id="loader"><span><i class="fas fa-spinner fa-spin"></i> 数据加载中...</span></div>
         <div id="chart-container"></div>
     </div>
@@ -287,43 +239,146 @@
 </div>
 
 <script>
+    // -------------------------------------------------------------------------
+    // 配置与全局变量
+    // -------------------------------------------------------------------------
+    const GITHUB_CONFIG = {
+        owner: 'dlezywj-cell',
+        repo: 'stocktracker',
+        path: 'groups.json'
+    };
+
     let rawData = null; 
+    let groupsData = null; 
+    let activeGroupName = null; 
+
     let myChart = null;
     let selectedSeries = new Set();
     let currentRankedData = []; 
     let globalAllDates = [];
     let visibilityState = {};
-    let currentViewData = []; // 用于存储当前视野下的数据，供标签使用
+    let currentViewData = [];
     
     // -------------------------------------------------------------------------
-    // 色表
+    // 辅助函数：UTF8 Base64 编码 (解决中文乱码)
+    // -------------------------------------------------------------------------
+    function utf8_to_b64(str) {
+        return window.btoa(unescape(encodeURIComponent(str)));
+    }
+    function b64_to_utf8(str) {
+        return decodeURIComponent(escape(window.atob(str)));
+    }
+
+    // -------------------------------------------------------------------------
+    // GitHub API 交互逻辑
+    // -------------------------------------------------------------------------
+    function manageToken() {
+        const current = localStorage.getItem('gh_token') || '';
+        const token = prompt("请输入 GitHub Access Token (需要 repo 权限) 以启用自动保存功能:", current);
+        if (token !== null) {
+            localStorage.setItem('gh_token', token.trim());
+            alert("Token 已保存！");
+        }
+    }
+
+    async function saveCurrentSelection() {
+        if (selectedSeries.size === 0) return;
+
+        const token = localStorage.getItem('gh_token');
+        if (!token) {
+            alert("请先点击右上角齿轮图标设置 GitHub Token！");
+            return;
+        }
+
+        const groupName = prompt("请输入新板块名称 (例如: 消费白马):");
+        if (!groupName) return;
+
+        // 获取当前锁定的列表
+        const indices = Array.from(selectedSeries);
+
+        // UI 状态
+        const saveBtn = document.getElementById('saveGroupBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+        saveBtn.disabled = true;
+
+        try {
+            // 1. 获取当前 groups.json 文件 (为了拿到 sha 和现有内容)
+            const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
+            let sha = null;
+            let currentContent = {};
+
+            const getRes = await fetch(apiUrl, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (getRes.status === 200) {
+                const fileData = await getRes.json();
+                sha = fileData.sha;
+                // 解码现有内容
+                try {
+                    currentContent = JSON.parse(b64_to_utf8(fileData.content));
+                } catch (e) {
+                    console.error("JSON Parse Error", e);
+                }
+            } else if (getRes.status !== 404) {
+                throw new Error("GitHub API Error: " + getRes.status);
+            }
+
+            // 2. 更新内容
+            currentContent[groupName] = indices;
+            
+            // 3. 上传新文件 (PUT)
+            const newContentBase64 = utf8_to_b64(JSON.stringify(currentContent, null, 2));
+            
+            const putRes = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: `Update group: ${groupName}`,
+                    content: newContentBase64,
+                    sha: sha // 如果是新建文件，sha 为 null/undefined 即可
+                })
+            });
+
+            if (!putRes.ok) {
+                const errData = await putRes.json();
+                throw new Error("Upload Failed: " + (errData.message || putRes.status));
+            }
+
+            alert(`板块【${groupName}】保存成功！`);
+            
+            // 清除锁定并刷新数据
+            selectedSeries.clear();
+            updateVisuals(null);
+            fetchData(); // 重新拉取最新的 groups.json
+
+        } catch (error) {
+            alert("保存失败: " + error.message);
+            console.error(error);
+        } finally {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 核心图表逻辑
     // -------------------------------------------------------------------------
     const colorPalette = [
-        '#FF3030', // 红
-        '#007AFF', // 蓝 (红蓝对比)
-        '#00C040', // 绿 (三原色)
-        '#FFD700', // 金黄 (亮色)
-        '#9C27B0', // 紫
-        '#00CED1', // 青
-        '#FF9500', // 橙
-        '#FF1493', // 深粉
-        '#8B4513', // 棕
-        '#708090', // 灰
-        '#000000', // 黑
-        '#ADFF2F', // 绿黄
-        '#4B0082', // 靛青
-        '#FF4500', // 红橙
-        '#2E8B57', // 海藻绿
-        '#800000', // 栗色
-        '#4682B4', // 钢蓝
-        '#D2691E', // 巧克力
-        '#000080', // 深蓝
-        '#DC143C'  // 猩红
+        '#FF3030', '#007AFF', '#00C040', '#FFD700', '#9C27B0', 
+        '#00CED1', '#FF9500', '#FF1493', '#8B4513', '#708090', 
+        '#000000', '#ADFF2F', '#4B0082', '#FF4500', '#2E8B57', 
+        '#800000', '#4682B4', '#D2691E', '#000080', '#DC143C'
     ];
-    
     let industryColors = {}; 
 
-    // 新增函数：根据当前“可见”的曲线，重新分配颜色
     function reassignColors() {
         let visibleCount = 0;
         currentRankedData.forEach(item => {
@@ -331,7 +386,7 @@
                 industryColors[item.name] = colorPalette[visibleCount % colorPalette.length];
                 visibleCount++;
             } else {
-                industryColors[item.name] = '#cccccc'; // 隐藏时用淡灰
+                industryColors[item.name] = '#cccccc';
             }
         });
     }
@@ -351,14 +406,34 @@
         loader.classList.add('show');
         dot.className = 'sync-dot loading';
         timeTxt.innerText = '更新中';
+        
         try {
-            const response = await fetch('industry_data.json?t=' + Date.now());
-            if (!response.ok) throw new Error("Status: " + response.status);
-            rawData = await response.json();
+            // 并行请求数据和配置
+            const [dataRes, groupRes] = await Promise.all([
+                fetch('industry_data.json?t=' + Date.now()),
+                fetch('groups.json?t=' + Date.now()).catch(() => null)
+            ]);
+
+            if (!dataRes.ok) throw new Error("Data Status: " + dataRes.status);
+            rawData = await dataRes.json();
             globalAllDates = rawData.dates;
+            
+            if (groupRes && groupRes.ok) {
+                groupsData = await groupRes.json();
+            } else {
+                groupsData = {}; // 默认为空
+            }
+            renderGroupTabs();
+
             dot.className = 'sync-dot online';
             timeTxt.innerText = (rawData.last_update || '未知').split(' ')[0];
-            calculateRankAndRender(true); 
+            
+            // 如果当前在某个板块下，保持该板块；否则重新计算排名
+            if (activeGroupName && groupsData[activeGroupName]) {
+                renderGroupView(activeGroupName);
+            } else {
+                calculateRankAndRender(true); 
+            }
         } catch (error) {
             console.error(error);
             dot.className = 'sync-dot';
@@ -369,19 +444,58 @@
         }
     }
 
+    // 渲染板块标签
+    function renderGroupTabs() {
+        const container = document.getElementById('group-tabs');
+        // 保留第一个“排名”按钮
+        let html = `<div class="group-chip ${activeGroupName === null ? 'active' : ''}" onclick="switchGroup(null, this)">🏆 涨幅排名</div>`;
+        
+        if (groupsData) {
+            Object.keys(groupsData).forEach(gName => {
+                const isActive = (gName === activeGroupName) ? 'active' : '';
+                html += `<div class="group-chip ${isActive}" onclick="switchGroup('${gName}', this)">${gName}</div>`;
+            });
+        }
+        container.innerHTML = html;
+    }
+
+    // 切换板块
+    function switchGroup(groupName, el) {
+        // 更新 UI 激活状态
+        document.querySelectorAll('.group-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        
+        activeGroupName = groupName;
+        
+        // 切换输入框状态
+        const rankInputs = document.getElementById('ranking-inputs');
+        if (groupName) {
+            rankInputs.classList.add('disabled');
+            renderGroupView(groupName);
+        } else {
+            rankInputs.classList.remove('disabled');
+            calculateRankAndRender(false);
+        }
+    }
+
+    // 渲染特定板块视图
+    function renderGroupView(groupName) {
+        const targetNames = groupsData[groupName];
+        if (!targetNames || !rawData) return;
+        
+        processDataAndRender(targetNames, false);
+    }
+
+    // 原有的排名逻辑
     function calculateRankAndRender(isInit = false) {
         if (!rawData) return;
-        selectedSeries.clear();
-        visibilityState = {};
-        industryColors = {}; 
         
-        document.getElementById('chart-tags').innerHTML = '';
-
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
         const nStart = parseInt(document.getElementById('rankStart').value);
         const nEnd = parseInt(document.getElementById('rankEnd').value);
 
+        // 1. 计算所有行业的涨幅
         let sIdx = globalAllDates.findIndex(d => d >= sDate);
         if (sIdx === -1) sIdx = 0;
         let eIdx = globalAllDates.findIndex(d => d > eDate);
@@ -392,36 +506,73 @@
             const prices = rawData.data[name];
             if (!prices || prices.length <= sIdx) return;
             
+            // 找有效起点
             let startPrice = prices[sIdx];
-            if (!startPrice || startPrice === 0) {
+            if (!startPrice) {
                 for(let k = sIdx; k < Math.min(prices.length, eIdx); k++) {
-                     if(prices[k] && prices[k] !== 0) {
-                         startPrice = prices[k];
-                         break;
-                     }
+                     if(prices[k]) { startPrice = prices[k]; break; }
                 }
             }
-
             const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
             
-            if (startPrice && endPrice && startPrice !== 0) {
+            if (startPrice && endPrice) {
                 const pct = (endPrice - startPrice) / startPrice;
-                tempRank.push({ name: name, pct: pct, fullData: prices });
+                tempRank.push({ name: name, pct: pct });
             }
         });
 
+        // 2. 排序并截取
         tempRank.sort((a, b) => b.pct - a.pct);
-        currentRankedData = tempRank.slice(nStart - 1, nEnd);
+        const targetList = tempRank.slice(nStart - 1, nEnd).map(item => item.name);
         
-        // 初始化可见性
-        currentRankedData.forEach((item) => {
-            visibilityState[item.name] = true;
+        processDataAndRender(targetList, isInit);
+    }
+
+    // 通用的数据处理与渲染函数
+    function processDataAndRender(targetNames, isInit) {
+        selectedSeries.clear();
+        visibilityState = {};
+        industryColors = {}; 
+        document.getElementById('chart-tags').innerHTML = '';
+        
+        // 确保“保存”按钮状态重置
+        updateVisuals(null); 
+
+        // 提取数据
+        currentRankedData = [];
+        targetNames.forEach(name => {
+            if (rawData.data[name]) {
+                // 计算当前区间的涨幅用于排序列表
+                currentRankedData.push({
+                    name: name,
+                    fullData: rawData.data[name],
+                    // pct 将在 updateChartAndList 中动态计算
+                });
+                visibilityState[name] = true;
+            }
         });
 
-        // 核心：应用动态颜色分配
         reassignColors();
 
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+        let sIdx = globalAllDates.findIndex(d => d >= sDate);
+        if (sIdx === -1) sIdx = 0;
+        let eIdx = globalAllDates.findIndex(d => d > eDate);
+        if (eIdx === -1) eIdx = globalAllDates.length;
+
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
+        
+        // 如果非初始化（切换Tab），强制更新一次图表范围
+        if (!isInit && myChart) {
+             const opt = myChart.getOption();
+             if (opt.dataZoom && opt.dataZoom[0]) {
+                 // 保持当前的 zoom
+                 updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
+             } else {
+                 updateChartAndList(sIdx, eIdx);
+             }
+        }
     }
 
     function initChart(startIdx, endIdx) {
@@ -436,11 +587,11 @@
             smooth: true,
             showSymbol: false, 
             triggerLineEvent: true,
-            lineStyle: { width: 2, color: industryColors[item.name] }, // 显式指定颜色
+            lineStyle: { width: 2, color: industryColors[item.name] },
             data: visibilityState[item.name] ? item.fullData : [], 
             emphasis: { disabled: true },
             z: 2,
-            itemStyle: { color: industryColors[item.name] } // 显式指定颜色
+            itemStyle: { color: industryColors[item.name] }
         }));
 
         let startPercent = 0;
@@ -456,70 +607,46 @@
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
-                z: 100,
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
-                        // 这里只是 Tooltip 的样式，不影响线条锁定
                         const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
-                        
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
                         const dotOpacity = isDimmed ? '0.3' : '1';
-                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
                         html += `<div style="color:${textColor}; font-weight:${fontWeight}">
-                                    ${colorDot}${p.seriesName}: ${valStr}
+                                    <span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>
+                                    ${p.seriesName}: ${valStr}
                                  </div>`;
                     });
                     return html;
                 }
             },
             xAxis: {
-                type: 'category', 
-                data: globalAllDates,
-                boundaryGap: false,
+                type: 'category', data: globalAllDates, boundaryGap: false,
                 axisLine: { lineStyle: { color: '#eee' } },
                 axisLabel: { color: '#999', fontSize: 10 }
             },
             yAxis: {
-                type: 'value', 
-                scale: true, 
-                splitLine: { lineStyle: { color: '#f5f5f7' } },
+                type: 'value', scale: true, splitLine: { lineStyle: { color: '#f5f5f7' } },
                 axisLabel: { color: '#999', fontSize: 10, formatter: (val) => ((val-1)*100).toFixed(0) + '%' }
             },
             dataZoom: [
-                {
-                    type: 'slider',
-                    show: true,
-                    xAxisIndex: 0,
-                    top: 5,
-                    bottom: undefined, 
-                    height: 20,
-                    borderColor: 'transparent',
-                    handleSize: '80%',
-                    start: startPercent,
-                    end: endPercent
-                },
-                {
-                    type: 'inside',
-                    xAxisIndex: 0,
-                    zoomOnMouseWheel: true,
-                    moveOnMouseMove: true
-                }
+                { type: 'slider', show: true, xAxisIndex: 0, top: 5, height: 20, borderColor: 'transparent', handleSize: '80%', start: startPercent, end: endPercent },
+                { type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }
             ],
             series: series
         };
 
-        myChart.setOption(option, true);
+        myChart.setOption(option, true); // true = not merge, reset
         
         if (startIdx === null) {
             const opt = myChart.getOption();
-            const sPct = opt.dataZoom[0].start;
-            startIdx = Math.floor(globalAllDates.length * sPct / 100);
+            startIdx = Math.floor(globalAllDates.length * opt.dataZoom[0].start / 100);
         }
         if (endIdx === null) endIdx = globalAllDates.length;
 
@@ -527,22 +654,18 @@
     }
 
     function updateChartAndList(sIdx, eIdx) {
+        if (!globalAllDates.length) return;
         sIdx = Math.max(0, Math.min(sIdx, globalAllDates.length - 1));
         eIdx = Math.min(eIdx, globalAllDates.length); 
         const actualEndIdx = Math.max(sIdx, eIdx - 1); 
 
         const newSeries = currentRankedData.map(item => {
-            if (!visibilityState[item.name]) {
-                return { data: [] };
-            }
+            if (!visibilityState[item.name]) return { data: [] };
 
             let basePrice = item.fullData[sIdx];
-            if (!basePrice || basePrice === 0) {
+            if (!basePrice) {
                 for(let i = sIdx; i < item.fullData.length; i++) {
-                    if(item.fullData[i] && item.fullData[i] !== 0) { 
-                        basePrice = item.fullData[i]; 
-                        break; 
-                    }
+                    if(item.fullData[i]) { basePrice = item.fullData[i]; break; }
                 }
             }
             if (!basePrice) return { data: item.fullData.map(() => null) };
@@ -552,7 +675,6 @@
                 return parseFloat((p / basePrice).toFixed(4));
             });
             
-            // 核心修改：更新数据时，同时强制更新颜色
             return { 
                 data: processedData,
                 itemStyle: { color: industryColors[item.name] },
@@ -569,21 +691,13 @@
             const startP = item.fullData[sIdx];
             const endP = item.fullData[actualEndIdx];
             let currentPct = -999; 
-
-            if (startP && endP && startP !== 0) {
-                currentPct = (endP - startP) / startP;
-            }
-            return {
-                name: item.name,
-                currentPct: currentPct
-            };
+            if (startP && endP) currentPct = (endP - startP) / startP;
+            return { name: item.name, currentPct: currentPct };
         });
 
         currentViewData = sortedList;
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
-        
-        // 如果有锁定或悬停状态，确保视觉效果正确
         updateVisuals(null);
     }
 
@@ -594,7 +708,6 @@
             const color = industryColors[item.name];
             let pctStr = '--';
             let cls = '';
-            
             if (item.currentPct !== -999) {
                 pctStr = (item.currentPct * 100).toFixed(2) + '%';
                 cls = item.currentPct >= 0 ? 'up' : 'down';
@@ -604,7 +717,6 @@
             if (!visibilityState[item.name]) {
                 itemClass += ' unchecked';
             } else if (selectedSeries.size > 0) {
-                // 初始化时如果已经被锁定，就加 active，否则 dim
                 if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -615,7 +727,6 @@
                  onmouseenter="applyHighlight('${item.name}')"
                  onmouseleave="clearHighlight()"
                  onclick="toggleLock('${item.name}')">
-                
                 <div class="idx-left-group">
                     <input type="checkbox" class="idx-chk" 
                            ${visibilityState[item.name] ? 'checked' : ''}
@@ -633,62 +744,49 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
-        
         if (!visibilityState[name] && selectedSeries.has(name)) {
             selectedSeries.delete(name);
         }
-
-        // 核心：每次勾选/取消，都重新分配颜色，保证可见线条对比度最大
         reassignColors();
-
         const opt = myChart.getOption();
-        const startValue = opt.dataZoom[0].startValue;
-        const endValue = opt.dataZoom[0].endValue;
-        updateChartAndList(startValue, endValue);
+        updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
     }
 
     function setupEvents() {
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
+            // 简单的处理逻辑，实际 startValue 比较准
+            let start = opt.dataZoom[0].startValue;
+            let end = opt.dataZoom[0].endValue;
             
-            const startPct = opt.dataZoom[0].start;
-            const totalLen = globalAllDates.length;
-            let sIdx = Math.floor(totalLen * startPct / 100);
-
-            const fixedEndDate = document.getElementById('endDate').value;
-            let eIdx = globalAllDates.findIndex(d => d > fixedEndDate);
-            if (eIdx === -1) eIdx = totalLen;
-            
-            if (sIdx >= eIdx) sIdx = Math.max(0, eIdx - 5);
-
-            updateChartAndList(sIdx, eIdx);
-
-            if (globalAllDates[sIdx]) {
-                document.getElementById('startDate').value = globalAllDates[sIdx];
+            // 为了同步日期选择器（可选）
+            if (start != null && globalAllDates[start]) {
+                document.getElementById('startDate').value = globalAllDates[start];
             }
+            updateChartAndList(start, end);
         });
 
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
-        
-        myChart.on('click', function(params) { 
-            if (params.componentType === 'series') toggleLock(params.seriesName); 
-        });
+        myChart.on('click', function(params) { if (params.componentType === 'series') toggleLock(params.seriesName); });
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
         myChart.on('mouseout', function(params) { if (params.componentType === 'series') clearHighlight(); });
     }
 
     function handleRankingInputChange() {
-        calculateRankAndRender(false);
+        // 如果在板块模式下修改日期，只重刷数据，不重算排名逻辑
+        if (activeGroupName) {
+            renderGroupView(activeGroupName);
+        } else {
+            calculateRankAndRender(false);
+        }
     }
 
     function applyHighlight(targetName) {
         if (!visibilityState[targetName]) return;
-        // 允许在锁定状态下继续触发悬停高亮
         updateVisuals(targetName);
     }
     
     function clearHighlight() {
-        // 允许在锁定状态下恢复悬停前的状态
         updateVisuals(null); 
     }
     
@@ -698,106 +796,69 @@
         if (targetName === null) {
             selectedSeries.clear();
         } else {
-            if (selectedSeries.has(targetName)) {
-                selectedSeries.delete(targetName);
-            } else {
-                selectedSeries.add(targetName);
-            }
+            if (selectedSeries.has(targetName)) selectedSeries.delete(targetName);
+            else selectedSeries.add(targetName);
         }
         updateVisuals(null); 
     }
 
-    // 核心修改：逻辑合并，支持“锁定”与“悬停”的叠加
+    // 视觉更新：控制高亮、锁定状态、以及保存按钮的显示
     function updateVisuals(hoverName) {
         const hasSelection = selectedSeries.size > 0;
         const hasHover = hoverName !== null;
-        // 只要有锁定 或者 有悬停，就进入“专注模式”（其他变淡）
-        const isFocusMode = hasSelection || hasHover; 
+        const isFocusMode = hasSelection || hasHover;
+
+        // 1. 控制保存按钮显示
+        const saveBtn = document.getElementById('saveGroupBtn');
+        if (hasSelection) {
+            saveBtn.style.display = 'flex';
+        } else {
+            saveBtn.style.display = 'none';
+        }
 
         const tagContainer = document.getElementById('chart-tags');
-        
-        // 1. 生成顶部 HTML 标签 (只显示【已锁定】的标签，避免鼠标快速移动时标签闪烁抖动)
         let tagsHtml = '';
         if (hasSelection) {
             selectedSeries.forEach(name => {
                 const dataItem = currentViewData.find(d => d.name === name);
-                // 容错处理
                 if (!dataItem) return;
-
                 const color = industryColors[name];
                 let valStr = '--';
-                let valColor = '#fff';
-                let valBg = color;
-
                 if (dataItem.currentPct !== -999) {
-                    valStr = ((dataItem.currentPct) * 100).toFixed(2) + '%';
-                    const sign = dataItem.currentPct >= 0 ? '+' : '';
-                    valStr = sign + valStr;
+                    valStr = (dataItem.currentPct >= 0 ? '+' : '') + ((dataItem.currentPct) * 100).toFixed(2) + '%';
                 }
-
                 tagsHtml += `
                     <div class="chart-tag-chip" style="border-color:${color}; color:${color}">
                         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
                         <span>${name}</span>
-                        <span style="background:${valBg};color:${valColor};padding:0 4px;border-radius:3px;font-size:11px;margin-left:2px;">${valStr}</span>
-                    </div>
-                `;
+                        <span style="background:${color};color:#fff;padding:0 4px;border-radius:3px;font-size:11px;margin-left:2px;">${valStr}</span>
+                    </div>`;
             });
         }
         tagContainer.innerHTML = tagsHtml;
 
-        // 2. 更新图表线条样式
         const newStyles = currentRankedData.map(item => {
-            // 判断当前线条是否应该高亮（被锁定 或 被悬停）
             const isHighlighted = selectedSeries.has(item.name) || item.name === hoverName;
-            
             if (!isFocusMode) {
-                // 如果既没锁定也没悬停，恢复默认全显示状态（线宽2）
-                return { 
-                    lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, 
-                    z: 2,
-                    endLabel: { show: false }
-                };
+                return { lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
             }
-
             if (isHighlighted) {
-                // 高亮样式：不透明，加粗，层级最高
-                return { 
-                    lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, 
-                    z: 10,
-                    endLabel: { show: false } 
-                };
+                return { lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, z: 10, endLabel: { show: false } };
             } else {
-                // 非高亮样式：变淡，变细，层级低
-                return { 
-                    lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
-                    z: 2,
-                    endLabel: { show: false } 
-                };
+                return { lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
             }
         });
-        
         myChart.setOption({ series: newStyles });
 
-        // 3. 更新右侧列表样式
         document.querySelectorAll('.list-item').forEach(el => {
             const name = el.dataset.name;
             if (!visibilityState[name]) return;
-
             el.classList.remove('active-state', 'dimmed');
+            if (!isFocusMode) return;
 
-            if (!isFocusMode) {
-                // 默认模式：什么都不加
-                return;
-            }
-
-            // 列表高亮逻辑同上
             if (selectedSeries.has(name) || name === hoverName) {
                 el.classList.add('active-state');
-                // 如果是悬停触发的，且不在可视区，自动滚动（可选优化）
-                if (name === hoverName) {
-                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
+                if (name === hoverName) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
                 el.classList.add('dimmed');
             }
