@@ -261,7 +261,7 @@
 
 <script>
     // -------------------------------------------------------------------------
-    // 配置管理
+    // 配置管理 - 这里已经帮你填好了默认值
     // -------------------------------------------------------------------------
     let GITHUB_CONFIG = {
         owner: '',
@@ -271,7 +271,8 @@
     };
 
     function loadConfig() {
-        GITHUB_CONFIG.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell'; // 默认值方便你
+        // 自动读取，如果没有则使用你的默认仓库信息
+        GITHUB_CONFIG.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell';
         GITHUB_CONFIG.repo = localStorage.getItem('gh_repo') || 'stocktracker';
         GITHUB_CONFIG.token = localStorage.getItem('gh_token') || '';
         
@@ -366,7 +367,6 @@
             globalAllDates = rawData.dates;
             
             // 2. 获取板块配置 (通过 GitHub API 以支持私有仓库读取)
-            // 如果没有 Token 或 fetch 失败，尝试直接 fetch 文件(兼容 public 仓库)
             let loadedGroups = null;
             
             if (GITHUB_CONFIG.token && GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
@@ -389,28 +389,29 @@
                         // 文件不存在是正常的，说明还没创建
                         loadedGroups = {}; 
                         dot.className = 'sync-dot online';
-                        timeTxt.innerText = "等待创建板块";
+                        timeTxt.innerText = "就绪 (未建组)";
                     } else {
-                        throw new Error(`GitHub API Error: ${ghRes.status}`);
+                        // Token 错误或其他 API 错误
+                         console.warn(`GitHub API Error: ${ghRes.status}`);
                     }
                 } catch (e) {
                     console.warn("GitHub API Fetch Failed, trying direct access...", e);
                 }
             }
 
-            // 降级尝试：直接读取 groups.json (如果上面的 API 失败或者没配置 Token)
+            // 降级尝试：直接读取 groups.json (如果 Token 没填，或者 API 失败)
             if (loadedGroups === null) {
                 try {
                     const fallbackRes = await fetch('groups.json?t=' + Date.now());
                     if (fallbackRes.ok) {
                         loadedGroups = await fallbackRes.json();
                         dot.className = 'sync-dot online';
-                        timeTxt.innerText = "本地读取模式";
+                        timeTxt.innerText = "读取模式";
                     } else {
                         loadedGroups = {}; // 也没文件，默认为空
                         if(!GITHUB_CONFIG.token) {
                             dot.className = 'sync-dot error';
-                            timeTxt.innerText = "未配置Token";
+                            timeTxt.innerText = "需配置Token";
                         }
                     }
                 } catch(e) { loadedGroups = {}; }
@@ -434,7 +435,6 @@
             console.error(error);
             dot.className = 'sync-dot error';
             timeTxt.innerText = '数据错误';
-            alert("加载失败，请检查设置中的仓库名是否正确");
         } finally {
             loader.classList.remove('show');
         }
@@ -534,7 +534,7 @@
         if (selectedSeries.size === 0) return;
 
         if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) {
-            alert("请先点击右上角齿轮图标，配置 GitHub 仓库信息和 Token！");
+            alert("请先点击右上角齿轮图标，配置 Token！");
             openSettings();
             return;
         }
@@ -864,7 +864,7 @@
     window.addEventListener('resize', () => myChart && myChart.resize());
     
     // 初始化
-    loadConfig(); // 加载 Token 配置
+    loadConfig(); 
     initDate();
     fetchData(); 
 </script>
