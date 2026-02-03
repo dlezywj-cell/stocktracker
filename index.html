@@ -296,7 +296,7 @@
     let currentViewData = []; // 用于存储当前视野下的数据，供标签使用
     
     // -------------------------------------------------------------------------
-    // 核心修改：使用高对比度色表，并支持动态分配
+    // 色表
     // -------------------------------------------------------------------------
     const colorPalette = [
         '#FF3030', // 红
@@ -324,7 +324,6 @@
     let industryColors = {}; 
 
     // 新增函数：根据当前“可见”的曲线，重新分配颜色
-    // 确保无论选中哪几个，都优先使用最鲜艳的对比色
     function reassignColors() {
         let visibleCount = 0;
         currentRankedData.forEach(item => {
@@ -464,6 +463,7 @@
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
+                        // 这里只是 Tooltip 的样式，不影响线条锁定
                         const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
                         
                         const textColor = isDimmed ? '#999' : '#333';
@@ -583,9 +583,8 @@
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
         
-        if (selectedSeries.size > 0) {
-            updateVisuals(null);
-        }
+        // 如果有锁定或悬停状态，确保视觉效果正确
+        updateVisuals(null);
     }
 
     function renderRankList(sortedData) {
@@ -605,6 +604,7 @@
             if (!visibilityState[item.name]) {
                 itemClass += ' unchecked';
             } else if (selectedSeries.size > 0) {
+                // 初始化时如果已经被锁定，就加 active，否则 dim
                 if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -636,7 +636,6 @@
         
         if (!visibilityState[name] && selectedSeries.has(name)) {
             selectedSeries.delete(name);
-            updateVisuals(null); 
         }
 
         // 核心：每次勾选/取消，都重新分配颜色，保证可见线条对比度最大
@@ -684,12 +683,12 @@
 
     function applyHighlight(targetName) {
         if (!visibilityState[targetName]) return;
-        if (selectedSeries.size > 0) return; 
+        // 允许在锁定状态下继续触发悬停高亮
         updateVisuals(targetName);
     }
     
     function clearHighlight() {
-        if (selectedSeries.size > 0) return;
+        // 允许在锁定状态下恢复悬停前的状态
         updateVisuals(null); 
     }
     
@@ -708,28 +707,34 @@
         updateVisuals(null); 
     }
 
+    // 核心修改：逻辑合并，支持“锁定”与“悬停”的叠加
     function updateVisuals(hoverName) {
         const hasSelection = selectedSeries.size > 0;
+        const hasHover = hoverName !== null;
+        // 只要有锁定 或者 有悬停，就进入“专注模式”（其他变淡）
+        const isFocusMode = hasSelection || hasHover; 
+
         const tagContainer = document.getElementById('chart-tags');
         
-        // 1. 生成顶部 HTML 标签
+        // 1. 生成顶部 HTML 标签 (只显示【已锁定】的标签，避免鼠标快速移动时标签闪烁抖动)
         let tagsHtml = '';
         if (hasSelection) {
             selectedSeries.forEach(name => {
                 const dataItem = currentViewData.find(d => d.name === name);
+                // 容错处理
+                if (!dataItem) return;
+
                 const color = industryColors[name];
-                
                 let valStr = '--';
                 let valColor = '#fff';
                 let valBg = color;
 
-                if (dataItem && dataItem.currentPct !== -999) {
+                if (dataItem.currentPct !== -999) {
                     valStr = ((dataItem.currentPct) * 100).toFixed(2) + '%';
                     const sign = dataItem.currentPct >= 0 ? '+' : '';
                     valStr = sign + valStr;
                 }
 
-                // 生成标签 HTML
                 tagsHtml += `
                     <div class="chart-tag-chip" style="border-color:${color}; color:${color}">
                         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
@@ -741,29 +746,29 @@
         }
         tagContainer.innerHTML = tagsHtml;
 
-        // 2. 更新图表线条样式 (确保 endLabel 不显示)
+        // 2. 更新图表线条样式
         const newStyles = currentRankedData.map(item => {
-            let isHighlighted = false;
+            // 判断当前线条是否应该高亮（被锁定 或 被悬停）
+            const isHighlighted = selectedSeries.has(item.name) || item.name === hoverName;
             
-            if (hasSelection) {
-                isHighlighted = selectedSeries.has(item.name);
-            } else if (hoverName) {
-                isHighlighted = item.name === hoverName;
-            } else {
+            if (!isFocusMode) {
+                // 如果既没锁定也没悬停，恢复默认全显示状态（线宽2）
                 return { 
-                    lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
+                    lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, 
                     z: 2,
                     endLabel: { show: false }
                 };
             }
 
             if (isHighlighted) {
+                // 高亮样式：不透明，加粗，层级最高
                 return { 
                     lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, 
                     z: 10,
                     endLabel: { show: false } 
                 };
             } else {
+                // 非高亮样式：变淡，变细，层级低
                 return { 
                     lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
                     z: 2,
@@ -774,25 +779,27 @@
         
         myChart.setOption({ series: newStyles });
 
+        // 3. 更新右侧列表样式
         document.querySelectorAll('.list-item').forEach(el => {
             const name = el.dataset.name;
             if (!visibilityState[name]) return;
 
             el.classList.remove('active-state', 'dimmed');
 
-            if (hasSelection) {
-                if (selectedSeries.has(name)) {
-                    el.classList.add('active-state');
-                } else {
-                    el.classList.add('dimmed');
-                }
-            } else if (hoverName) {
+            if (!isFocusMode) {
+                // 默认模式：什么都不加
+                return;
+            }
+
+            // 列表高亮逻辑同上
+            if (selectedSeries.has(name) || name === hoverName) {
+                el.classList.add('active-state');
+                // 如果是悬停触发的，且不在可视区，自动滚动（可选优化）
                 if (name === hoverName) {
-                    el.classList.add('active-state');
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                } else {
-                    el.classList.add('dimmed');
+                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
+            } else {
+                el.classList.add('dimmed');
             }
         });
     }
