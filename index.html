@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (Pro版)</title>
+    <title>行业强弱追踪 (板块专用版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -28,6 +28,30 @@
             background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; 
         }
         
+        /* --- 模态框样式 (设置面板) --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); z-index: 999; display: none;
+            align-items: center; justify-content: center; backdrop-filter: blur(2px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-card {
+            background: #fff; width: 90%; max-width: 320px; border-radius: 16px; padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .modal-title { font-weight: 700; font-size: 16px; margin-bottom: 15px; color: var(--text-main); }
+        .form-group { margin-bottom: 12px; }
+        .form-label { display: block; font-size: 12px; color: var(--text-sec); margin-bottom: 4px; }
+        .form-input { 
+            width: 100%; padding: 8px; border: 1px solid #e5e5e5; border-radius: 8px; 
+            font-size: 14px; box-sizing: border-box; outline: none;
+        }
+        .form-input:focus { border-color: var(--primary); }
+        .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-cancel { flex: 1; padding: 10px; border: none; background: #f2f2f2; border-radius: 8px; color: #666; font-weight: 600; cursor: pointer; }
+        .btn-confirm { flex: 1; padding: 10px; border: none; background: var(--primary); border-radius: 8px; color: white; font-weight: 600; cursor: pointer; }
+
+        /* --- 主界面样式 --- */
         header { 
             background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5;
             height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
@@ -37,8 +61,8 @@
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
+        .sync-dot.error { background: var(--danger); }
         
-        /* 设置按钮 */
         .header-btn {
             background: none; border: none; color: var(--text-sec); cursor: pointer; font-size: 16px; margin-left: 10px; padding: 5px;
         }
@@ -50,60 +74,46 @@
         }
         
         .control-row-top {
-            display: flex; align-items: center; flex-wrap: nowrap; overflow-x: auto; gap: 10px;
-            scrollbar-width: none; -ms-overflow-style: none; width: 100%;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 10px;
+            width: 100%;
         }
-        .control-row-top::-webkit-scrollbar { display: none; }
 
         .group-scroll-container {
             display: flex; gap: 8px; overflow-x: auto; width: 100%; padding-bottom: 2px;
-            scrollbar-width: none; -ms-overflow-style: none;
+            scrollbar-width: none; -ms-overflow-style: none; min-height: 28px;
         }
         .group-scroll-container::-webkit-scrollbar { display: none; }
 
         .group-chip {
-            padding: 4px 10px; border-radius: 14px; font-size: 12px; background: #fff; color: var(--text-sec);
+            padding: 4px 12px; border-radius: 14px; font-size: 12px; background: #fff; color: var(--text-sec);
             border: 1px solid #e5e5e5; white-space: nowrap; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
         }
         .group-chip.active {
             background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 500;
         }
+        .group-chip.empty-tip { border: 1px dashed #ccc; color: #999; background: transparent; cursor: default; }
 
         .input-group { 
             display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; 
         }
-        .input-group.disabled { opacity: 0.4; pointer-events: none; }
         
         .date-inp {
             border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
             padding: 4px 6px; border-radius: 6px; font-size: 12px; font-family: inherit;
             outline: none; text-align: center; width: 105px;
         }
-        .num-inp {
-            border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
-            width: 36px; text-align: center; font-size: 12px;
-        }
-        .btn-icon {
-            background: var(--primary); color: white; border: none; width: 28px; height: 28px;
-            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
         
-        /* 保存按钮 - 默认隐藏 */
         .btn-save {
             background: var(--success); color: white; border: none; padding: 0 12px; height: 28px;
             border-radius: 14px; cursor: pointer; display: none; align-items: center; gap: 6px; font-size: 12px;
             flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 500;
+            margin-left: auto; /* 推到最右边 */
         }
         .btn-save:active { opacity: 0.8; transform: scale(0.98); }
 
         @media (max-width: 768px) {
             .control-panel { padding: 8px 5px; gap: 6px; }
-            .control-row-top { justify-content: space-between; gap: 5px; }
-            .input-group { gap: 3px; }
-            .mobile-label { display: none; }
             .date-inp { width: 88px; font-size: 11px; padding: 4px 2px; }
-            .num-inp { width: 30px; padding: 4px 2px; }
         }
 
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
@@ -186,40 +196,28 @@
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
-        <button class="header-btn" onclick="manageToken()" title="GitHub Token 设置"><i class="fas fa-cog"></i></button>
+        <button class="header-btn" onclick="openSettings()" title="设置"><i class="fas fa-cog"></i></button>
     </div>
 </header>
 <div class="control-panel">
-    <!-- 第一行：日期与排名 -->
+    <!-- 第一行：日期控制 + 保存按钮 -->
     <div class="control-row-top">
         <div class="input-group">
-            <span class="mobile-label">选股范围:</span>
+            <span class="mobile-label">时间范围:</span>
             <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
             <span>-</span>
             <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
         </div>
         
-        <!-- 排名输入框 -->
-        <div class="input-group" id="ranking-inputs">
-            <span class="mobile-label">排名:</span>
-            <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
-            <span>-</span>
-            <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
-        </div>
-
-        <!-- 刷新按钮 -->
-        <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
-        
-        <!-- 保存板块按钮 (只有选中时才显示) -->
+        <!-- 保存板块按钮 (动态显示) -->
         <button id="saveGroupBtn" class="btn-save" onclick="saveCurrentSelection()">
             <i class="fas fa-save"></i> 保存为板块
         </button>
     </div>
     
-    <!-- 第二行：板块选择（动态生成） -->
+    <!-- 第二行：板块列表 -->
     <div class="group-scroll-container" id="group-tabs">
-        <div class="group-chip active" onclick="switchGroup(null, this)">🏆 涨幅排名</div>
-        <!-- 其他板块将通过JS动态加载 -->
+        <span class="group-chip empty-tip">加载中...</span>
     </div>
 </div>
 <div class="workspace">
@@ -231,151 +229,101 @@
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#888;font-size:10px;margin-left:4px;">(按涨幅排序)</span>
-            <span>区间收益率</span>
+            <span style="font-weight:normal;color:#888;font-size:10px;margin-left:4px;">(区间涨幅)</span>
+            <span>收益率</span>
         </div>
         <div class="list-body" id="rankList"></div>
     </div>
 </div>
 
+<!-- 设置模态框 -->
+<div class="modal-overlay" id="settingModal">
+    <div class="modal-card">
+        <div class="modal-title">配置 GitHub 存储</div>
+        <div class="form-group">
+            <label class="form-label">用户名 (User/Org)</label>
+            <input type="text" id="cfgOwner" class="form-input" placeholder="例如: dlezywj-cell">
+        </div>
+        <div class="form-group">
+            <label class="form-label">仓库名 (Repository)</label>
+            <input type="text" id="cfgRepo" class="form-input" placeholder="例如: stocktracker">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Access Token (需勾选 repo 权限)</label>
+            <input type="password" id="cfgToken" class="form-input" placeholder="ghp_xxxxxxxxxxxx">
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeSettings()">取消</button>
+            <button class="btn-confirm" onclick="saveSettings()">保存并刷新</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // -------------------------------------------------------------------------
-    // 配置与全局变量
+    // 配置管理
     // -------------------------------------------------------------------------
-    const GITHUB_CONFIG = {
-        owner: 'dlezywj-cell',
-        repo: 'stocktracker',
-        path: 'groups.json'
+    let GITHUB_CONFIG = {
+        owner: '',
+        repo: '',
+        path: 'groups.json',
+        token: ''
     };
 
+    function loadConfig() {
+        GITHUB_CONFIG.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell'; // 默认值方便你
+        GITHUB_CONFIG.repo = localStorage.getItem('gh_repo') || 'stocktracker';
+        GITHUB_CONFIG.token = localStorage.getItem('gh_token') || '';
+        
+        // 填充到设置弹窗
+        document.getElementById('cfgOwner').value = GITHUB_CONFIG.owner;
+        document.getElementById('cfgRepo').value = GITHUB_CONFIG.repo;
+        document.getElementById('cfgToken').value = GITHUB_CONFIG.token;
+    }
+
+    function openSettings() { document.getElementById('settingModal').classList.add('active'); }
+    function closeSettings() { document.getElementById('settingModal').classList.remove('active'); }
+    
+    function saveSettings() {
+        const owner = document.getElementById('cfgOwner').value.trim();
+        const repo = document.getElementById('cfgRepo').value.trim();
+        const token = document.getElementById('cfgToken').value.trim();
+
+        if(!owner || !repo) { alert("用户名和仓库名不能为空"); return; }
+
+        localStorage.setItem('gh_owner', owner);
+        localStorage.setItem('gh_repo', repo);
+        localStorage.setItem('gh_token', token);
+
+        loadConfig();
+        closeSettings();
+        fetchData(); // 重新加载数据
+    }
+
+    // -------------------------------------------------------------------------
+    // 全局变量
+    // -------------------------------------------------------------------------
     let rawData = null; 
-    let groupsData = null; 
+    let groupsData = {}; 
     let activeGroupName = null; 
 
     let myChart = null;
     let selectedSeries = new Set();
-    let currentRankedData = []; 
     let globalAllDates = [];
     let visibilityState = {};
+    let currentRankedData = []; 
     let currentViewData = [];
     
     // -------------------------------------------------------------------------
-    // 辅助函数：UTF8 Base64 编码 (解决中文乱码)
+    // 辅助工具
     // -------------------------------------------------------------------------
-    function utf8_to_b64(str) {
-        return window.btoa(unescape(encodeURIComponent(str)));
-    }
-    function b64_to_utf8(str) {
-        return decodeURIComponent(escape(window.atob(str)));
-    }
+    function utf8_to_b64(str) { return window.btoa(unescape(encodeURIComponent(str))); }
+    function b64_to_utf8(str) { return decodeURIComponent(escape(window.atob(str))); }
 
-    // -------------------------------------------------------------------------
-    // GitHub API 交互逻辑
-    // -------------------------------------------------------------------------
-    function manageToken() {
-        const current = localStorage.getItem('gh_token') || '';
-        const token = prompt("请输入 GitHub Access Token (需要 repo 权限) 以启用自动保存功能:", current);
-        if (token !== null) {
-            localStorage.setItem('gh_token', token.trim());
-            alert("Token 已保存！");
-        }
-    }
-
-    async function saveCurrentSelection() {
-        if (selectedSeries.size === 0) return;
-
-        const token = localStorage.getItem('gh_token');
-        if (!token) {
-            alert("请先点击右上角齿轮图标设置 GitHub Token！");
-            return;
-        }
-
-        const groupName = prompt("请输入新板块名称 (例如: 消费白马):");
-        if (!groupName) return;
-
-        // 获取当前锁定的列表
-        const indices = Array.from(selectedSeries);
-
-        // UI 状态
-        const saveBtn = document.getElementById('saveGroupBtn');
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
-        saveBtn.disabled = true;
-
-        try {
-            // 1. 获取当前 groups.json 文件 (为了拿到 sha 和现有内容)
-            const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
-            let sha = null;
-            let currentContent = {};
-
-            const getRes = await fetch(apiUrl, {
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-
-            if (getRes.status === 200) {
-                const fileData = await getRes.json();
-                sha = fileData.sha;
-                // 解码现有内容
-                try {
-                    currentContent = JSON.parse(b64_to_utf8(fileData.content));
-                } catch (e) {
-                    console.error("JSON Parse Error", e);
-                }
-            } else if (getRes.status !== 404) {
-                throw new Error("GitHub API Error: " + getRes.status);
-            }
-
-            // 2. 更新内容
-            currentContent[groupName] = indices;
-            
-            // 3. 上传新文件 (PUT)
-            const newContentBase64 = utf8_to_b64(JSON.stringify(currentContent, null, 2));
-            
-            const putRes = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: `Update group: ${groupName}`,
-                    content: newContentBase64,
-                    sha: sha // 如果是新建文件，sha 为 null/undefined 即可
-                })
-            });
-
-            if (!putRes.ok) {
-                const errData = await putRes.json();
-                throw new Error("Upload Failed: " + (errData.message || putRes.status));
-            }
-
-            alert(`板块【${groupName}】保存成功！`);
-            
-            // 清除锁定并刷新数据
-            selectedSeries.clear();
-            updateVisuals(null);
-            fetchData(); // 重新拉取最新的 groups.json
-
-        } catch (error) {
-            alert("保存失败: " + error.message);
-            console.error(error);
-        } finally {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // 核心图表逻辑
-    // -------------------------------------------------------------------------
     const colorPalette = [
         '#FF3030', '#007AFF', '#00C040', '#FFD700', '#9C27B0', 
         '#00CED1', '#FF9500', '#FF1493', '#8B4513', '#708090', 
-        '#000000', '#ADFF2F', '#4B0082', '#FF4500', '#2E8B57', 
-        '#800000', '#4682B4', '#D2691E', '#000080', '#DC143C'
+        '#000000', '#ADFF2F', '#4B0082', '#FF4500', '#2E8B57'
     ];
     let industryColors = {}; 
 
@@ -399,154 +347,160 @@
         document.getElementById('startDate').valueAsDate = start;
     }
 
+    // -------------------------------------------------------------------------
+    // 数据获取
+    // -------------------------------------------------------------------------
     async function fetchData() {
         const loader = document.getElementById('loader');
         const dot = document.getElementById('syncDot');
         const timeTxt = document.getElementById('updateTime');
         loader.classList.add('show');
         dot.className = 'sync-dot loading';
-        timeTxt.innerText = '更新中';
+        timeTxt.innerText = '连接中';
         
         try {
-            // 并行请求数据和配置
-            const [dataRes, groupRes] = await Promise.all([
-                fetch('industry_data.json?t=' + Date.now()),
-                fetch('groups.json?t=' + Date.now()).catch(() => null)
-            ]);
-
-            if (!dataRes.ok) throw new Error("Data Status: " + dataRes.status);
+            // 1. 获取行情数据 (本地或远程)
+            const dataRes = await fetch('industry_data.json?t=' + Date.now());
+            if (!dataRes.ok) throw new Error("行情数据加载失败");
             rawData = await dataRes.json();
             globalAllDates = rawData.dates;
             
-            if (groupRes && groupRes.ok) {
-                groupsData = await groupRes.json();
-            } else {
-                groupsData = {}; // 默认为空
+            // 2. 获取板块配置 (通过 GitHub API 以支持私有仓库读取)
+            // 如果没有 Token 或 fetch 失败，尝试直接 fetch 文件(兼容 public 仓库)
+            let loadedGroups = null;
+            
+            if (GITHUB_CONFIG.token && GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
+                const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
+                try {
+                    const ghRes = await fetch(apiUrl, {
+                        headers: { 
+                            'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        },
+                        cache: 'no-store'
+                    });
+                    
+                    if (ghRes.ok) {
+                        const fileData = await ghRes.json();
+                        loadedGroups = JSON.parse(b64_to_utf8(fileData.content));
+                        dot.className = 'sync-dot online';
+                        timeTxt.innerText = "已连接 GitHub";
+                    } else if (ghRes.status === 404) {
+                        // 文件不存在是正常的，说明还没创建
+                        loadedGroups = {}; 
+                        dot.className = 'sync-dot online';
+                        timeTxt.innerText = "等待创建板块";
+                    } else {
+                        throw new Error(`GitHub API Error: ${ghRes.status}`);
+                    }
+                } catch (e) {
+                    console.warn("GitHub API Fetch Failed, trying direct access...", e);
+                }
             }
+
+            // 降级尝试：直接读取 groups.json (如果上面的 API 失败或者没配置 Token)
+            if (loadedGroups === null) {
+                try {
+                    const fallbackRes = await fetch('groups.json?t=' + Date.now());
+                    if (fallbackRes.ok) {
+                        loadedGroups = await fallbackRes.json();
+                        dot.className = 'sync-dot online';
+                        timeTxt.innerText = "本地读取模式";
+                    } else {
+                        loadedGroups = {}; // 也没文件，默认为空
+                        if(!GITHUB_CONFIG.token) {
+                            dot.className = 'sync-dot error';
+                            timeTxt.innerText = "未配置Token";
+                        }
+                    }
+                } catch(e) { loadedGroups = {}; }
+            }
+            
+            groupsData = loadedGroups;
             renderGroupTabs();
 
-            dot.className = 'sync-dot online';
-            timeTxt.innerText = (rawData.last_update || '未知').split(' ')[0];
-            
-            // 如果当前在某个板块下，保持该板块；否则重新计算排名
+            // 默认选中第一个板块，或者显示全部
+            const groupNames = Object.keys(groupsData);
             if (activeGroupName && groupsData[activeGroupName]) {
                 renderGroupView(activeGroupName);
+            } else if (groupNames.length > 0) {
+                switchGroup(groupNames[0]);
             } else {
-                calculateRankAndRender(true); 
+                // 一个板块都没有，显示空状态
+                renderEmptyState();
             }
+
         } catch (error) {
             console.error(error);
-            dot.className = 'sync-dot';
-            dot.style.background = 'var(--danger)';
-            timeTxt.innerText = '失败';
+            dot.className = 'sync-dot error';
+            timeTxt.innerText = '数据错误';
+            alert("加载失败，请检查设置中的仓库名是否正确");
         } finally {
             loader.classList.remove('show');
         }
     }
 
-    // 渲染板块标签
+    // -------------------------------------------------------------------------
+    // 逻辑控制
+    // -------------------------------------------------------------------------
     function renderGroupTabs() {
         const container = document.getElementById('group-tabs');
-        // 保留第一个“排名”按钮
-        let html = `<div class="group-chip ${activeGroupName === null ? 'active' : ''}" onclick="switchGroup(null, this)">🏆 涨幅排名</div>`;
+        const names = Object.keys(groupsData);
         
-        if (groupsData) {
-            Object.keys(groupsData).forEach(gName => {
-                const isActive = (gName === activeGroupName) ? 'active' : '';
-                html += `<div class="group-chip ${isActive}" onclick="switchGroup('${gName}', this)">${gName}</div>`;
-            });
+        if (names.length === 0) {
+            container.innerHTML = `<span class="group-chip empty-tip">暂无板块，请在下方列表点击选中指数后保存</span>`;
+            return;
         }
+
+        let html = '';
+        // 渲染板块按钮
+        names.forEach(gName => {
+            const isActive = (gName === activeGroupName) ? 'active' : '';
+            html += `<div class="group-chip ${isActive}" onclick="switchGroup('${gName}', this)">${gName}</div>`;
+        });
+        
+        // 增加一个“显示全部”的按钮，方便去选新的
+        const allActive = (activeGroupName === '__ALL__') ? 'active' : '';
+        html += `<div class="group-chip ${allActive}" onclick="switchGroup('__ALL__', this)" style="border-style:dashed;">+ 新建/浏览全部</div>`;
+        
         container.innerHTML = html;
     }
 
-    // 切换板块
     function switchGroup(groupName, el) {
-        // 更新 UI 激活状态
-        document.querySelectorAll('.group-chip').forEach(c => c.classList.remove('active'));
-        el.classList.add('active');
-        
         activeGroupName = groupName;
+        renderGroupTabs(); // 重新渲染以更新高亮
         
-        // 切换输入框状态
-        const rankInputs = document.getElementById('ranking-inputs');
-        if (groupName) {
-            rankInputs.classList.add('disabled');
-            renderGroupView(groupName);
+        if (groupName === '__ALL__') {
+            // 显示全部数据，按字母或默认顺序，方便用户挑选
+            const allNames = Object.keys(rawData.data);
+            processDataAndRender(allNames, false);
         } else {
-            rankInputs.classList.remove('disabled');
-            calculateRankAndRender(false);
+            const targetNames = groupsData[groupName];
+            if (targetNames) processDataAndRender(targetNames, false);
         }
     }
 
-    // 渲染特定板块视图
-    function renderGroupView(groupName) {
-        const targetNames = groupsData[groupName];
-        if (!targetNames || !rawData) return;
-        
-        processDataAndRender(targetNames, false);
+    function renderEmptyState() {
+        activeGroupName = '__ALL__'; // 默认进入全览模式
+        renderGroupTabs();
+        const allNames = Object.keys(rawData.data);
+        processDataAndRender(allNames, true);
     }
 
-    // 原有的排名逻辑
-    function calculateRankAndRender(isInit = false) {
-        if (!rawData) return;
-        
-        const sDate = document.getElementById('startDate').value;
-        const eDate = document.getElementById('endDate').value;
-        const nStart = parseInt(document.getElementById('rankStart').value);
-        const nEnd = parseInt(document.getElementById('rankEnd').value);
-
-        // 1. 计算所有行业的涨幅
-        let sIdx = globalAllDates.findIndex(d => d >= sDate);
-        if (sIdx === -1) sIdx = 0;
-        let eIdx = globalAllDates.findIndex(d => d > eDate);
-        if (eIdx === -1) eIdx = globalAllDates.length;
-
-        let tempRank = [];
-        Object.keys(rawData.data).forEach(name => {
-            const prices = rawData.data[name];
-            if (!prices || prices.length <= sIdx) return;
-            
-            // 找有效起点
-            let startPrice = prices[sIdx];
-            if (!startPrice) {
-                for(let k = sIdx; k < Math.min(prices.length, eIdx); k++) {
-                     if(prices[k]) { startPrice = prices[k]; break; }
-                }
-            }
-            const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
-            
-            if (startPrice && endPrice) {
-                const pct = (endPrice - startPrice) / startPrice;
-                tempRank.push({ name: name, pct: pct });
-            }
-        });
-
-        // 2. 排序并截取
-        tempRank.sort((a, b) => b.pct - a.pct);
-        const targetList = tempRank.slice(nStart - 1, nEnd).map(item => item.name);
-        
-        processDataAndRender(targetList, isInit);
-    }
-
-    // 通用的数据处理与渲染函数
+    // 处理数据并渲染图表
     function processDataAndRender(targetNames, isInit) {
         selectedSeries.clear();
         visibilityState = {};
         industryColors = {}; 
         document.getElementById('chart-tags').innerHTML = '';
-        
-        // 确保“保存”按钮状态重置
-        updateVisuals(null); 
+        updateVisuals(null); // 重置按钮状态
 
-        // 提取数据
         currentRankedData = [];
         targetNames.forEach(name => {
             if (rawData.data[name]) {
-                // 计算当前区间的涨幅用于排序列表
                 currentRankedData.push({
                     name: name,
-                    fullData: rawData.data[name],
-                    // pct 将在 updateChartAndList 中动态计算
+                    fullData: rawData.data[name]
                 });
                 visibilityState[name] = true;
             }
@@ -563,11 +517,9 @@
 
         initChart(isInit ? sIdx : null, isInit ? eIdx : null);
         
-        // 如果非初始化（切换Tab），强制更新一次图表范围
         if (!isInit && myChart) {
              const opt = myChart.getOption();
              if (opt.dataZoom && opt.dataZoom[0]) {
-                 // 保持当前的 zoom
                  updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
              } else {
                  updateChartAndList(sIdx, eIdx);
@@ -575,6 +527,88 @@
         }
     }
 
+    // -------------------------------------------------------------------------
+    // 保存功能 (GitHub API)
+    // -------------------------------------------------------------------------
+    async function saveCurrentSelection() {
+        if (selectedSeries.size === 0) return;
+
+        if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) {
+            alert("请先点击右上角齿轮图标，配置 GitHub 仓库信息和 Token！");
+            openSettings();
+            return;
+        }
+
+        const groupName = prompt("请输入新板块名称 (例如: 消费白马):");
+        if (!groupName) return;
+
+        const indices = Array.from(selectedSeries);
+        const saveBtn = document.getElementById('saveGroupBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+        saveBtn.disabled = true;
+
+        try {
+            const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
+            
+            // 1. 尝试获取现有文件 (为了拿到 sha)
+            let sha = null;
+            let currentContent = {};
+            
+            const getRes = await fetch(apiUrl, {
+                headers: { 
+                    'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                cache: 'no-store'
+            });
+
+            if (getRes.ok) {
+                const fileData = await getRes.json();
+                sha = fileData.sha;
+                try { currentContent = JSON.parse(b64_to_utf8(fileData.content)); } catch (e) {}
+            }
+
+            // 2. 更新内容
+            currentContent[groupName] = indices;
+            
+            // 3. 写入文件 (创建或更新)
+            const newContentBase64 = utf8_to_b64(JSON.stringify(currentContent, null, 2));
+            
+            const putRes = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: `Update group: ${groupName}`,
+                    content: newContentBase64,
+                    sha: sha // 如果sha是null，GitHub会创建新文件
+                })
+            });
+
+            if (!putRes.ok) {
+                const err = await putRes.json();
+                throw new Error(err.message || "Upload failed");
+            }
+
+            alert(`板块【${groupName}】保存成功！`);
+            selectedSeries.clear();
+            updateVisuals(null);
+            fetchData(); // 刷新数据
+
+        } catch (error) {
+            alert("保存失败: " + error.message);
+        } finally {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 图表与交互 (复用)
+    // -------------------------------------------------------------------------
     function initChart(startIdx, endIdx) {
         if (!myChart) {
             myChart = echarts.init(document.getElementById('chart-container'));
@@ -594,8 +628,7 @@
             itemStyle: { color: industryColors[item.name] }
         }));
 
-        let startPercent = 0;
-        let endPercent = 100;
+        let startPercent = 0; let endPercent = 100;
         if (startIdx !== null && endIdx !== null && globalAllDates.length > 0) {
             startPercent = (startIdx / globalAllDates.length) * 100;
             endPercent = (endIdx / globalAllDates.length) * 100;
@@ -614,11 +647,11 @@
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
                         const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
-                        const textColor = isDimmed ? '#999' : '#333';
-                        const fontWeight = isDimmed ? 'normal' : 'bold';
                         const dotOpacity = isDimmed ? '0.3' : '1';
                         const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
-                        html += `<div style="color:${textColor}; font-weight:${fontWeight}">
+                        const textColor = isDimmed ? '#999' : '#333';
+                        const fontWeight = isDimmed ? 'normal' : 'bold';
+                        html += `<div style="color:${textColor};font-weight:${fontWeight}">
                                     <span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>
                                     ${p.seriesName}: ${valStr}
                                  </div>`;
@@ -642,14 +675,12 @@
             series: series
         };
 
-        myChart.setOption(option, true); // true = not merge, reset
-        
+        myChart.setOption(option, true);
         if (startIdx === null) {
             const opt = myChart.getOption();
             startIdx = Math.floor(globalAllDates.length * opt.dataZoom[0].start / 100);
         }
         if (endIdx === null) endIdx = globalAllDates.length;
-
         updateChartAndList(startIdx, endIdx);
     }
 
@@ -661,7 +692,6 @@
 
         const newSeries = currentRankedData.map(item => {
             if (!visibilityState[item.name]) return { data: [] };
-
             let basePrice = item.fullData[sIdx];
             if (!basePrice) {
                 for(let i = sIdx; i < item.fullData.length; i++) {
@@ -669,12 +699,10 @@
                 }
             }
             if (!basePrice) return { data: item.fullData.map(() => null) };
-
             const processedData = item.fullData.map((p, i) => {
                 if (i < sIdx || !p) return null;
                 return parseFloat((p / basePrice).toFixed(4));
             });
-            
             return { 
                 data: processedData,
                 itemStyle: { color: industryColors[item.name] },
@@ -682,10 +710,7 @@
             };
         });
         
-        myChart.setOption({ 
-            series: newSeries,
-            dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
-        });
+        myChart.setOption({ series: newSeries, dataZoom: [{ startValue: sIdx, endValue: eIdx }] });
 
         const sortedList = currentRankedData.map(item => {
             const startP = item.fullData[sIdx];
@@ -706,17 +731,15 @@
         let html = '';
         sortedData.forEach((item, index) => {
             const color = industryColors[item.name];
-            let pctStr = '--';
-            let cls = '';
+            let pctStr = '--'; let cls = '';
             if (item.currentPct !== -999) {
                 pctStr = (item.currentPct * 100).toFixed(2) + '%';
                 cls = item.currentPct >= 0 ? 'up' : 'down';
             }
 
             let itemClass = 'list-item';
-            if (!visibilityState[item.name]) {
-                itemClass += ' unchecked';
-            } else if (selectedSeries.size > 0) {
+            if (!visibilityState[item.name]) itemClass += ' unchecked';
+            else if (selectedSeries.size > 0) {
                 if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -733,7 +756,7 @@
                            onclick="event.stopPropagation(); toggleVisibility('${item.name}')">
                     <div class="idx-name">
                         <div class="idx-dot" style="background:${color}"></div>
-                        ${index + 1}. ${item.name}
+                        ${item.name}
                     </div>
                 </div>
                 <div class="idx-val ${cls}">${item.currentPct >= 0 ? '+' : ''}${pctStr}</div>
@@ -744,9 +767,7 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
-        if (!visibilityState[name] && selectedSeries.has(name)) {
-            selectedSeries.delete(name);
-        }
+        if (!visibilityState[name] && selectedSeries.has(name)) selectedSeries.delete(name);
         reassignColors();
         const opt = myChart.getOption();
         updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
@@ -755,17 +776,13 @@
     function setupEvents() {
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
-            // 简单的处理逻辑，实际 startValue 比较准
             let start = opt.dataZoom[0].startValue;
             let end = opt.dataZoom[0].endValue;
-            
-            // 为了同步日期选择器（可选）
             if (start != null && globalAllDates[start]) {
                 document.getElementById('startDate').value = globalAllDates[start];
             }
             updateChartAndList(start, end);
         });
-
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
         myChart.on('click', function(params) { if (params.componentType === 'series') toggleLock(params.seriesName); });
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
@@ -773,11 +790,10 @@
     }
 
     function handleRankingInputChange() {
-        // 如果在板块模式下修改日期，只重刷数据，不重算排名逻辑
         if (activeGroupName) {
-            renderGroupView(activeGroupName);
-        } else {
-            calculateRankAndRender(false);
+            // 如果在板块模式下，只重新渲染当前板块
+            const targetNames = (activeGroupName === '__ALL__') ? Object.keys(rawData.data) : groupsData[activeGroupName];
+            processDataAndRender(targetNames, false);
         }
     }
 
@@ -786,35 +802,25 @@
         updateVisuals(targetName);
     }
     
-    function clearHighlight() {
-        updateVisuals(null); 
-    }
+    function clearHighlight() { updateVisuals(null); }
     
     function toggleLock(targetName) {
         if (targetName && !visibilityState[targetName]) return;
-        
-        if (targetName === null) {
-            selectedSeries.clear();
-        } else {
+        if (targetName === null) selectedSeries.clear();
+        else {
             if (selectedSeries.has(targetName)) selectedSeries.delete(targetName);
             else selectedSeries.add(targetName);
         }
         updateVisuals(null); 
     }
 
-    // 视觉更新：控制高亮、锁定状态、以及保存按钮的显示
     function updateVisuals(hoverName) {
         const hasSelection = selectedSeries.size > 0;
         const hasHover = hoverName !== null;
         const isFocusMode = hasSelection || hasHover;
 
-        // 1. 控制保存按钮显示
         const saveBtn = document.getElementById('saveGroupBtn');
-        if (hasSelection) {
-            saveBtn.style.display = 'flex';
-        } else {
-            saveBtn.style.display = 'none';
-        }
+        saveBtn.style.display = hasSelection ? 'flex' : 'none';
 
         const tagContainer = document.getElementById('chart-tags');
         let tagsHtml = '';
@@ -824,9 +830,7 @@
                 if (!dataItem) return;
                 const color = industryColors[name];
                 let valStr = '--';
-                if (dataItem.currentPct !== -999) {
-                    valStr = (dataItem.currentPct >= 0 ? '+' : '') + ((dataItem.currentPct) * 100).toFixed(2) + '%';
-                }
+                if (dataItem.currentPct !== -999) valStr = (dataItem.currentPct >= 0 ? '+' : '') + ((dataItem.currentPct) * 100).toFixed(2) + '%';
                 tagsHtml += `
                     <div class="chart-tag-chip" style="border-color:${color}; color:${color}">
                         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
@@ -839,14 +843,9 @@
 
         const newStyles = currentRankedData.map(item => {
             const isHighlighted = selectedSeries.has(item.name) || item.name === hoverName;
-            if (!isFocusMode) {
-                return { lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
-            }
-            if (isHighlighted) {
-                return { lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, z: 10, endLabel: { show: false } };
-            } else {
-                return { lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
-            }
+            if (!isFocusMode) return { lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
+            if (isHighlighted) return { lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, z: 10, endLabel: { show: false } };
+            else return { lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
         });
         myChart.setOption({ series: newStyles });
 
@@ -855,17 +854,17 @@
             if (!visibilityState[name]) return;
             el.classList.remove('active-state', 'dimmed');
             if (!isFocusMode) return;
-
             if (selectedSeries.has(name) || name === hoverName) {
                 el.classList.add('active-state');
                 if (name === hoverName) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } else {
-                el.classList.add('dimmed');
-            }
+            } else el.classList.add('dimmed');
         });
     }
 
     window.addEventListener('resize', () => myChart && myChart.resize());
+    
+    // 初始化
+    loadConfig(); // 加载 Token 配置
     initDate();
     fetchData(); 
 </script>
