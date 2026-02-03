@@ -3,157 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (调试版)</title>
-    <!-- 使用稳定的 CDN -->
+    <title>行业强弱追踪 (专业版)</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --bg: #f5f5f7; --card: #ffffff; --text-main: #1d1d1f; --text-sec: #86868b; --primary: #007aff; --success: #34c759; --danger: #ff3b30; --radius: 12px; }
-        html, body { height: 100%; width: 100%; overflow: hidden; position: fixed; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; }
-        
-        /* 布局样式 */
-        header { background: #fff; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
-        .app-title { font-weight: 700; font-size: 15px; }
-        .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
-        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .sync-dot.online { background: var(--success); }
-        .sync-dot.error { background: var(--danger); }
-        
-        .control-panel { background: var(--bg); padding: 8px 12px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #e5e5e5; }
-        .control-row { display: flex; align-items: center; gap: 10px; overflow-x: auto; }
-        .input-group { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; }
-        .date-inp { border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; font-size: 12px; width: 105px; text-align: center; }
-        .btn-icon { background: var(--primary); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;}
-        .btn-save { background: var(--success); color: white; border: none; padding: 0 12px; height: 28px; border-radius: 14px; font-size: 12px; margin-left: auto; display: none; align-items: center; gap: 5px; }
-        
-        .group-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
-        .group-chip { padding: 4px 12px; border-radius: 14px; font-size: 12px; background: #fff; border: 1px solid #e5e5e5; white-space: nowrap; cursor: pointer; color: #666; }
-        .group-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-        .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; position: relative; }
-        .chart-wrapper { flex: 1; background: #fff; border-radius: 12px; position: relative; display: flex; flex-direction: column; }
-        #chart-container { width: 100%; height: 100%; }
-        .list-wrapper { width: 240px; background: #fff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
-        .list-body { flex: 1; overflow-y: auto; padding: 5px; }
-        .list-item { padding: 8px; border-bottom: 1px solid #f5f5f5; font-size: 12px; display: flex; justify-content: space-between; cursor: pointer; }
-        .list-item.active-state { background: #eef6ff; font-weight: bold; border-left: 3px solid var(--primary); }
-        .list-item.dimmed { opacity: 0.4; }
-
-        /* --- 调试控制台样式 --- */
-        #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
-            background: rgba(0,0,0,0.85); color: #0f0; font-family: monospace;
-            font-size: 11px; padding: 10px; box-sizing: border-box;
-            overflow-y: auto; z-index: 9999; border-top: 2px solid #333;
-            display: block; /* 默认显示 */
+        :root {
+            --bg: #f5f5f7; --card: #ffffff; --text-main: #1d1d1f; --text-sec: #86868b;
+            --primary: #007aff; --success: #34c759; --danger: #ff3b30; --radius: 12px;
+            --header-bg: #f2f4f8; 
         }
-        .log-line { margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px; }
-        .log-err { color: #ff4d4d; font-weight: bold; background: rgba(255,0,0,0.1); }
-        .log-warn { color: #ffd700; }
+        
+        html, body { height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; position: fixed; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; }
+        
+        /* 头部 */
+        header { background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 10; }
+        .app-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+        .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
+        .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
+        .sync-dot.online { background: var(--success); }
+        .header-btn { background: none; border: none; color: var(--text-sec); cursor: pointer; font-size: 16px; margin-left: 8px; padding: 4px; }
+
+        /* --- 控制面板 (单行紧凑布局) --- */
+        .control-panel {
+            background: var(--bg); padding: 8px 12px; flex-shrink: 0;
+            display: flex; align-items: center; gap: 8px;
+            overflow-x: auto; white-space: nowrap; /* 允许横向滚动 */
+            border-bottom: 1px solid #e5e5e5; z-index: 10;
+            scrollbar-width: none; 
+        }
+        .control-panel::-webkit-scrollbar { display: none; }
+
+        .input-group { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; }
+        
+        .date-inp {
+            border: 1px solid #e5e5e5; background: #fff; color: var(--text-main);
+            padding: 4px; border-radius: 6px; font-size: 12px; width: 95px; text-align: center; font-family: inherit; outline: none;
+        }
+        .num-inp {
+            border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
+            width: 32px; text-align: center; font-size: 12px; outline: none;
+        }
+
+        /* 下拉选择框 (核心修改) */
+        .group-select {
+            padding: 4px 24px 4px 8px; border-radius: 6px; border: 1px solid #e5e5e5;
+            background: #fff url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007AFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E") no-repeat right 6px center;
+            background-size: 10px;
+            appearance: none; -webkit-appearance: none;
+            font-size: 12px; color: var(--primary); font-weight: 600;
+            min-width: 100px; max-width: 140px; outline: none; cursor: pointer; flex-shrink: 0;
+        }
+
+        .btn-icon {
+            background: var(--primary); color: white; border: none; width: 26px; height: 26px;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; margin-left: 4px;
+        }
+
+        /* 功能按钮 */
+        .btn-action {
+            border: none; padding: 0 10px; height: 26px; border-radius: 13px; 
+            cursor: pointer; display: none; align-items: center; gap: 4px; flex-shrink: 0;
+            font-size: 11px; font-weight: 500; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-left: auto; /* 推到右边 */
+        }
+        .btn-save { background: var(--success); }
+        .btn-del { background: var(--danger); margin-left: 4px;}
+
+        /* 主界面 */
+        .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
+        .chart-wrapper { flex: 1; background: var(--card); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; position: relative; min-width: 0; }
+        .chart-tags-container { position: absolute; top: 10px; left: 55px; right: 20px; height: auto; min-height: 30px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; pointer-events: none; z-index: 5; }
+        .chart-tag-chip { background: rgba(255, 255, 255, 0.95); border: 1px solid #e5e5e5; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); pointer-events: auto; }
+        #chart-container { width: 100%; height: 100%; }
+
+        /* 列表 */
+        .list-wrapper { width: 260px; background: var(--card); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+        .list-header { padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--text-main); background: var(--header-bg); border-top: 1px solid #e5e5e5; border-bottom: 1px solid #dcdcdc; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .list-body { flex: 1; overflow-y: auto; padding: 4px 0; background: var(--card); }
+        .list-item { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; }
+        .list-item:hover { background: #f9f9f9; }
+        .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); }
+        .list-item.dimmed { opacity: 0.35; filter: grayscale(100%); } 
+        .list-item.unchecked { opacity: 0.5; background: #fcfcfc; }
+        
+        .idx-left { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+        .idx-chk { cursor: pointer; }
+        .idx-dot { width: 8px; height: 8px; border-radius: 2px; }
+        .up { color: var(--danger); } .down { color: var(--success); }
+        .loading-mask { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 13px; color: var(--text-sec); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .loading-mask.show { opacity: 1; pointer-events: auto; }
 
         /* 模态框 */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .modal-overlay.active { display: flex; }
-        .modal-card { background: #fff; width: 80%; padding: 20px; border-radius: 12px; }
-        .form-input { width: 100%; padding: 8px; margin: 5px 0 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;}
-        .modal-btns { display: flex; gap: 10px; }
-        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 6px; }
+        .modal-card { background: #fff; width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .form-input { width: 100%; padding: 8px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; }
 
         @media (max-width: 768px) {
+            .control-panel { padding: 8px 10px; }
+            .date-inp { width: 82px; font-size: 11px; }
             .workspace { flex-direction: column; padding: 0; }
-            .chart-wrapper { flex: 0 0 50%; border-radius: 0; }
-            .list-wrapper { width: 100%; flex: 1; border-radius: 0; }
-            #debug-console { height: 150px; }
+            .chart-wrapper { flex: 0 0 55vh; border-radius: 0; box-shadow: none; border-bottom: none; }
+            .list-wrapper { width: 100%; flex: 1; border-radius: 0; box-shadow: none; }
         }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="app-title">行业强弱 (调试模式)</div>
+    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪</div>
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
-        <span id="updateTime">初始化...</span>
-        <button onclick="openSettings()" style="border:none;background:none;font-size:16px;">⚙️</button>
+        <span id="updateTime">连接中...</span>
+        <button class="header-btn" onclick="openSettings()" title="设置"><i class="fas fa-cog"></i></button>
     </div>
 </header>
 
 <div class="control-panel">
-    <div class="control-row">
-        <div class="input-group">
-            <input type="date" id="startDate" class="date-inp" onchange="handleInputChange()">
-            -
-            <input type="date" id="endDate" class="date-inp" onchange="handleInputChange()">
-        </div>
-        <button class="btn-icon" onclick="fetchData()">🔄</button>
-        <button id="saveGroupBtn" class="btn-save" onclick="saveCurrentSelection()">💾 保存</button>
+    <!-- 日期 -->
+    <div class="input-group">
+        <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
+        <span>-</span>
+        <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
     </div>
-    <div class="group-tabs" id="groupTabs"></div>
+    
+    <!-- 排名范围 (保留) -->
+    <div class="input-group" id="rankInputs">
+        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
+        <span>-</span>
+        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
+    </div>
+
+    <!-- 模式下拉框 (在同一行) -->
+    <select id="modeSelect" class="group-select" onchange="handleModeChange(this.value)">
+        <option value="__RANKING__">🏆 自动排名</option>
+        <option disabled>──────────</option>
+        <!-- 动态插入板块 -->
+    </select>
+
+    <!-- 刷新按钮 -->
+    <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
+    
+    <!-- 右侧功能按钮 -->
+    <div style="margin-left:auto; display:flex;">
+        <button id="saveGroupBtn" class="btn-action btn-save" onclick="saveCurrentSelection()">
+            <i class="fas fa-save"></i> 保存
+        </button>
+        <button id="delGroupBtn" class="btn-action btn-del" onclick="deleteCurrentGroup()">
+            <i class="fas fa-trash"></i> 删除
+        </button>
+    </div>
 </div>
 
 <div class="workspace">
     <div class="chart-wrapper">
+        <div id="chart-tags" class="chart-tags-container"></div>
+        <div class="loading-mask" id="loader"><span><i class="fas fa-spinner fa-spin"></i> 数据加载中...</span></div>
         <div id="chart-container"></div>
     </div>
     <div class="list-wrapper">
+        <div class="list-header">
+            <span>名称</span>
+            <span>收益率</span>
+        </div>
         <div class="list-body" id="rankList"></div>
     </div>
 </div>
 
-<!-- 调试控制台 -->
-<div id="debug-console">
-    <div style="color:#fff;border-bottom:1px solid #666;margin-bottom:5px;">
-        DEBUG CONSOLE (请截图红色报错信息) 
-        <button onclick="document.getElementById('debug-console').style.display='none'" style="float:right;font-size:10px;">关闭</button>
-    </div>
-    <div id="debug-logs"></div>
-</div>
-
-<!-- 设置弹窗 -->
+<!-- 设置模态框 -->
 <div class="modal-overlay" id="settingModal">
     <div class="modal-card">
-        <h3>GitHub 配置</h3>
+        <h3 style="margin-top:0">GitHub 配置</h3>
+        <div style="font-size:12px;color:#888;margin-bottom:10px;">用于读取和保存自定义板块</div>
         <input type="text" id="cfgOwner" class="form-input" placeholder="用户名 (Owner)">
         <input type="text" id="cfgRepo" class="form-input" placeholder="仓库名 (Repo)">
         <input type="password" id="cfgToken" class="form-input" placeholder="Token (ghp_...)">
         <div class="modal-btns">
-            <button style="background:#eee" onclick="closeSettings()">取消</button>
-            <button style="background:var(--primary);color:#fff" onclick="saveSettings()">保存并重试</button>
+            <button style="background:#f2f2f2;color:#666" onclick="closeSettings()">取消</button>
+            <button style="background:var(--primary);color:#fff" onclick="saveSettings()">保存</button>
         </div>
     </div>
 </div>
 
 <script>
-    // --- 调试工具 ---
-    function log(msg, type='info') {
-        const consoleDiv = document.getElementById('debug-logs');
-        const line = document.createElement('div');
-        line.className = 'log-line ' + (type === 'error' ? 'log-err' : (type === 'warn' ? 'log-warn' : ''));
-        const time = new Date().toLocaleTimeString();
-        line.textContent = `[${time}] ${msg}`;
-        consoleDiv.appendChild(line);
-        consoleDiv.scrollTop = consoleDiv.scrollHeight;
-        console.log(msg); // 同时也打到浏览器控制台
-    }
-    window.onerror = function(msg, url, line) {
-        log(`全局错误: ${msg} (Line: ${line})`, 'error');
-    };
-
     // --- 配置 ---
-    let CONFIG = { owner: '', repo: '', path: 'groups.json', token: '' };
-    
+    let GITHUB = { owner: '', repo: '', path: 'groups.json', token: '' };
     function loadConfig() {
-        CONFIG.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell';
-        CONFIG.repo = localStorage.getItem('gh_repo') || 'stocktracker';
-        CONFIG.token = localStorage.getItem('gh_token') || '';
-        
-        document.getElementById('cfgOwner').value = CONFIG.owner;
-        document.getElementById('cfgRepo').value = CONFIG.repo;
-        document.getElementById('cfgToken').value = CONFIG.token;
-        log(`配置加载完毕: Owner=${CONFIG.owner}, Repo=${CONFIG.repo}, Token=${CONFIG.token ? '已填写(隐藏)' : '未填写'}`);
+        GITHUB.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell';
+        GITHUB.repo = localStorage.getItem('gh_repo') || 'stocktracker';
+        GITHUB.token = localStorage.getItem('gh_token') || '';
+        document.getElementById('cfgOwner').value = GITHUB.owner;
+        document.getElementById('cfgRepo').value = GITHUB.repo;
+        document.getElementById('cfgToken').value = GITHUB.token;
     }
-
     function openSettings() { document.getElementById('settingModal').classList.add('active'); }
     function closeSettings() { document.getElementById('settingModal').classList.remove('active'); }
     function saveSettings() {
@@ -164,297 +210,374 @@
         localStorage.setItem('gh_owner', o);
         localStorage.setItem('gh_repo', r);
         localStorage.setItem('gh_token', t);
-        loadConfig();
-        closeSettings();
-        fetchData();
+        loadConfig(); closeSettings(); fetchData();
     }
 
     // --- 全局变量 ---
-    let rawData = null, groupsData = {}, myChart = null;
-    let selectedSeries = new Set(), globalDates = [], activeMode = 'RANKING', activeGroupName = null;
+    let rawData = null, groupsData = {};
+    let myChart = null, selectedSeries = new Set();
+    let globalDates = [], activeMode = '__RANKING__', activeGroupName = null;
+    let industryColors = {}, currentRankedData = [], currentViewData = [];
+    const colorPalette = ['#FF3030','#007AFF','#00C040','#FFD700','#9C27B0','#00CED1','#FF9500','#FF1493','#8B4513','#708090','#000000'];
 
-    // --- 核心逻辑：带详细调试的 Fetch ---
+    // --- 数据获取 ---
     async function fetchData() {
-        log("开始 fetchData...");
+        const loader = document.getElementById('loader');
         const dot = document.getElementById('syncDot');
         const timeTxt = document.getElementById('updateTime');
-        dot.className = 'sync-dot';
-        dot.style.background = 'orange';
-        timeTxt.innerText = '加载中...';
-
+        loader.classList.add('show'); dot.className = 'sync-dot loading';
+        
         try {
-            // 1. 加载行情数据
-            log("步骤1: 请求 industry_data.json");
+            // 1. 行情数据
             const res = await fetch('industry_data.json?t=' + Date.now());
-            if(!res.ok) throw new Error(`行情文件请求失败: ${res.status} ${res.statusText}`);
-            
-            try {
-                rawData = await res.json();
-                log(`行情数据解析成功: 包含 ${rawData.dates?.length} 天数据`);
-            } catch(e) {
-                throw new Error("industry_data.json 格式错误: " + e.message);
-            }
+            if(!res.ok) throw new Error("Load data failed");
+            rawData = await res.json();
             globalDates = rawData.dates;
 
-            // 2. 加载板块数据 (GitHub)
-            log("步骤2: 请求板块数据 (groups.json)");
-            groupsData = {}; // 重置
-            
-            if (CONFIG.token && CONFIG.owner && CONFIG.repo) {
-                const url = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.path}`;
-                log(`尝试连接 GitHub API: ${url}`);
-                
-                const ghRes = await fetch(url, {
-                    headers: { 
-                        'Authorization': `Bearer ${CONFIG.token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    },
-                    cache: 'no-store'
-                });
-
-                log(`GitHub 响应状态码: ${ghRes.status}`);
-
-                if (ghRes.ok) {
-                    const json = await ghRes.json();
-                    try {
-                        const content = decodeURIComponent(escape(window.atob(json.content)));
-                        groupsData = JSON.parse(content);
-                        log("✅ GitHub 板块数据加载成功");
-                    } catch(e) {
-                        log("⚠️ Base64解码或JSON解析失败: " + e.message, 'warn');
-                    }
-                } else if (ghRes.status === 404) {
-                    log("ℹ️ groups.json 不存在 (尚未创建)，这是正常的", 'warn');
-                } else if (ghRes.status === 401) {
-                    log("❌ 401 Unauthorized: Token 无效或过期！请检查设置。", 'error');
-                } else if (ghRes.status === 403) {
-                    log("❌ 403 Forbidden: 权限不足或 API 速率限制。", 'error');
-                } else {
-                    const errText = await ghRes.text();
-                    log(`❌ GitHub 未知错误: ${ghRes.status} - ${errText}`, 'error');
-                }
-            } else {
-                log("⚠️ 未配置 Token，跳过 GitHub API，尝试读取本地缓存/文件...", 'warn');
+            // 2. 板块数据
+            groupsData = {};
+            if(GITHUB.token) {
                 try {
-                    const localRes = await fetch('groups.json?t=' + Date.now());
-                    if(localRes.ok) {
-                        groupsData = await localRes.json();
-                        log("✅ 本地 groups.json 读取成功");
+                    const url = `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.path}`;
+                    const gRes = await fetch(url, { headers: { 'Authorization': `Bearer ${GITHUB.token}` }, cache: 'no-store' });
+                    if(gRes.ok) {
+                        const json = await gRes.json();
+                        groupsData = JSON.parse(decodeURIComponent(escape(window.atob(json.content))));
                     }
-                } catch(e) { log("本地文件读取也失败了 (忽略)"); }
+                } catch(e) { console.warn("GitHub fetch error", e); }
+            } else {
+                try {
+                    const lRes = await fetch('groups.json?t=' + Date.now());
+                    if(lRes.ok) groupsData = await lRes.json();
+                } catch(e){}
             }
 
             dot.className = 'sync-dot online';
-            dot.style.background = 'var(--success)';
-            timeTxt.innerText = "就绪";
+            timeTxt.innerText = (rawData.last_update || 'Ready').split(' ')[0];
             
-            renderTabs();
+            updateDropdown();
             calcAndRender(true);
 
         } catch (err) {
-            log("🚨 致命错误中止: " + err.message, 'error');
-            dot.className = 'sync-dot error';
-            timeTxt.innerText = "出错";
-            alert("发生错误，请看底部黑色控制台的红字:\n" + err.message);
-        }
-    }
-
-    // --- 保存功能 (调试版) ---
-    async function saveCurrentSelection() {
-        if(selectedSeries.size === 0) return;
-        if(!CONFIG.token) { alert("请先在设置中填写 Token"); return; }
-        
-        const name = prompt("输入板块名称:");
-        if(!name) return;
-        
-        log(`开始保存板块: ${name}`);
-        const btn = document.getElementById('saveGroupBtn');
-        btn.disabled = true;
-        btn.innerText = "保存中...";
-
-        try {
-            const url = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.path}`;
-            
-            // 1. Get SHA
-            let sha = null;
-            let currentContent = {};
-            log("正在获取文件 SHA...");
-            
-            const getRes = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${CONFIG.token}` }, cache: 'no-store'
-            });
-            
-            if(getRes.ok) {
-                const data = await getRes.json();
-                sha = data.sha;
-                try { currentContent = JSON.parse(decodeURIComponent(escape(window.atob(data.content)))); } catch(e){}
-                log(`获取成功, SHA: ${sha}`);
-            } else if (getRes.status === 404) {
-                log("文件不存在，将新建文件");
-            } else {
-                throw new Error(`获取文件失败: ${getRes.status}`);
-            }
-
-            // 2. Put
-            currentContent[name] = Array.from(selectedSeries);
-            const contentStr = JSON.stringify(currentContent, null, 2);
-            const b64 = window.btoa(unescape(encodeURIComponent(contentStr)));
-            
-            log("正在上传新内容...");
-            const putRes = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: `Update group ${name}`,
-                    content: b64,
-                    sha: sha
-                })
-            });
-
-            if(!putRes.ok) {
-                const errTxt = await putRes.text();
-                throw new Error(`上传失败 ${putRes.status}: ${errTxt}`);
-            }
-
-            log("✅ 保存成功!");
-            alert("保存成功");
-            selectedSeries.clear();
-            fetchData();
-
-        } catch(e) {
-            log("❌ 保存流程失败: " + e.message, 'error');
-            alert("保存失败: " + e.message);
+            console.error(err);
+            dot.className = 'sync-dot error'; timeTxt.innerText = "Error";
         } finally {
-            btn.disabled = false;
-            btn.innerText = "💾 保存";
+            loader.classList.remove('show');
         }
     }
 
-    // --- 渲染逻辑 (简化版，仅保证能跑通) ---
-    function renderTabs() {
-        const div = document.getElementById('groupTabs');
-        let html = `<div class="group-chip ${activeMode==='RANKING'?'active':''}" onclick="switchMode('RANKING')">🏆 排名</div>`;
-        Object.keys(groupsData).forEach(k => {
-            html += `<div class="group-chip ${activeMode==='GROUP'&&activeGroupName===k?'active':''}" onclick="switchMode('GROUP','${k}')">${k}</div>`;
+    // --- 界面交互 ---
+    function updateDropdown() {
+        const sel = document.getElementById('modeSelect');
+        // 保留前两个选项 (自动排名 和 分割线)
+        sel.innerHTML = `<option value="__RANKING__">🏆 自动排名</option><option disabled>──────────</option>`;
+        
+        Object.keys(groupsData).forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.innerText = name; // 这里可以加 emoji 📁 
+            sel.appendChild(opt);
         });
-        div.innerHTML = html;
+
+        // 恢复选中状态
+        if(activeMode === '__RANKING__') sel.value = '__RANKING__';
+        else if(groupsData[activeGroupName]) sel.value = activeGroupName;
+        else {
+            sel.value = '__RANKING__';
+            activeMode = '__RANKING__';
+            activeGroupName = null;
+        }
+        
+        updateButtons();
     }
 
-    function switchMode(mode, name) {
-        activeMode = mode;
-        activeGroupName = name;
-        renderTabs();
+    function handleModeChange(val) {
+        activeMode = val;
+        activeGroupName = val === '__RANKING__' ? null : val;
         calcAndRender(false);
+        updateButtons();
+    }
+    
+    function updateButtons() {
+        // 删除按钮：只有在选中具体板块时才显示
+        const isGroup = activeMode !== '__RANKING__';
+        document.getElementById('delGroupBtn').style.display = isGroup ? 'flex' : 'none';
+        
+        // 排名输入框：在板块模式下，视觉上可以变灰，但根据需求保留功能
+        const rankInputs = document.getElementById('rankInputs');
+        rankInputs.style.opacity = isGroup ? '0.5' : '1'; 
+        
+        // 保存按钮：有选中线条时显示
+        document.getElementById('saveGroupBtn').style.display = selectedSeries.size > 0 ? 'flex' : 'none';
     }
 
+    // --- 计算与渲染 ---
     function calcAndRender(init) {
         if(!rawData) return;
-        selectedSeries.clear();
-        updateUI();
-        
-        let targetNames = activeMode === 'RANKING' ? Object.keys(rawData.data) : (groupsData[activeGroupName] || []);
-        let list = [];
-        
-        // 简单计算区间涨跌幅
+        selectedSeries.clear(); updateButtons();
+
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
         let sIdx = globalDates.findIndex(d=>d>=sDate); if(sIdx<0) sIdx=0;
         let eIdx = globalDates.findIndex(d=>d>eDate); if(eIdx<0) eIdx=globalDates.length;
+
+        let list = [];
+        // 决定数据源
+        let targetNames = (activeMode === '__RANKING__') ? Object.keys(rawData.data) : (groupsData[activeGroupName] || []);
         
         targetNames.forEach(name => {
             const arr = rawData.data[name];
-            if(!arr) return;
-            const v1 = arr[sIdx] || arr.find((v,i)=>i>sIdx && v);
-            const v2 = arr[Math.min(arr.length-1, eIdx-1)];
+            if(!arr || arr.length <= sIdx) return;
+            // 找有效起点
+            let v1 = arr[sIdx];
+            if(!v1) { for(let k=sIdx;k<Math.min(arr.length,eIdx);k++) if(arr[k]){v1=arr[k];break;} }
+            let v2 = arr[Math.min(arr.length-1, eIdx-1)];
+            
             if(v1 && v2) {
-                list.push({ name, pct: (v2-v1)/v1, data: arr });
+                list.push({ name: name, pct: (v2-v1)/v1, fullData: arr });
             }
         });
 
         list.sort((a,b) => b.pct - a.pct);
-        if(activeMode === 'RANKING') list = list.slice(0, 10);
-        
-        renderChart(list, sIdx, eIdx, init);
-        renderList(list);
+
+        // 截取 (仅在排名模式下生效，板块模式展示所有)
+        if(activeMode === '__RANKING__') {
+            const nStart = parseInt(document.getElementById('rankStart').value) || 1;
+            const nEnd = parseInt(document.getElementById('rankEnd').value) || 10;
+            currentRankedData = list.slice(nStart-1, nEnd);
+        } else {
+            currentRankedData = list;
+        }
+
+        // 分配颜色
+        industryColors = {};
+        currentRankedData.forEach((item, i) => {
+            industryColors[item.name] = colorPalette[i % colorPalette.length];
+        });
+
+        renderChart(sIdx, eIdx, init);
+        // 如果不是初始化，且在缩放中，保持缩放
+        if(!init && myChart) {
+            const opt = myChart.getOption();
+            if(opt.dataZoom) updateChartData(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
+        }
     }
 
-    function renderChart(data, sIdx, eIdx, init) {
-        if(!myChart) myChart = echarts.init(document.getElementById('chart-container'));
-        const series = data.map((item, i) => ({
-            name: item.name, type: 'line', showSymbol: false, smooth:true,
-            data: item.data.map((v, idx) => idx < sIdx ? null : (v / (item.data[sIdx]||v))),
-            lineStyle: { width: 2 }, z: 2
-        }));
+    function renderChart(sIdx, eIdx, init) {
+        if(!myChart) {
+            myChart = echarts.init(document.getElementById('chart-container'));
+            setupChartEvents();
+        }
         
+        // 初始空数据，稍后由 updateChartData 填充
+        const series = currentRankedData.map(item => ({
+            name: item.name, type: 'line', smooth: true, showSymbol: false,
+            lineStyle: { width: 2, color: industryColors[item.name] },
+            itemStyle: { color: industryColors[item.name] },
+            data: [], 
+            z: 2
+        }));
+
         const opt = {
             animation: false,
-            grid: { left:40, right:10, top:20, bottom:30 },
-            xAxis: { type: 'category', data: globalDates },
-            yAxis: { type: 'value', scale:true, axisLabel:{formatter:v=>((v-1)*100).toFixed(0)+'%'} },
-            dataZoom: [{ type:'slider', startValue: sIdx, endValue: eIdx, show:true }],
-            tooltip: { trigger:'axis', formatter: p => {
-                let s = p[0].axisValue + '<br>';
-                p.sort((a,b)=>b.value-a.value);
-                p.forEach(x => s+=`${x.marker}${x.seriesName}: ${((x.value-1)*100).toFixed(2)}%<br>`);
-                return s;
-            }},
+            grid: { left:40, right:15, top:25, bottom:25 },
+            xAxis: { type: 'category', data: globalDates, boundaryGap:false, axisLine:{lineStyle:{color:'#eee'}} },
+            yAxis: { type: 'value', scale:true, splitLine:{lineStyle:{color:'#f5f5f7'}}, axisLabel:{color:'#999', formatter:v=>((v-1)*100).toFixed(0)+'%'} },
+            dataZoom: [{ type:'slider', show:true, startValue:sIdx, endValue:eIdx, height:15, bottom:5 }, { type:'inside' }],
+            tooltip: { trigger:'axis', formatter: makeTooltip },
             series: series
         };
-        myChart.setOption(opt, true); 
-        myChart.off('click');
-        myChart.on('click', params => {
-            if(params.componentType === 'series') toggleSel(params.seriesName);
+        myChart.setOption(opt, true);
+        updateChartData(sIdx, eIdx);
+    }
+
+    function updateChartData(sIdx, eIdx) {
+        if(!globalDates.length) return;
+        sIdx = Math.max(0, Math.min(sIdx, globalDates.length-1));
+        eIdx = Math.min(eIdx, globalDates.length);
+        
+        const newSeries = currentRankedData.map(item => {
+            let base = item.fullData[sIdx];
+            if(!base) { for(let k=sIdx; k<item.fullData.length; k++) if(item.fullData[k]){base=item.fullData[k];break;} }
+            if(!base) return { data: [] };
+            
+            const d = item.fullData.map((v,i) => (i<sIdx||!v) ? null : parseFloat((v/base).toFixed(4)));
+            return { data: d };
         });
+        
+        myChart.setOption({ series: newSeries, dataZoom: [{ startValue: sIdx, endValue: eIdx }] });
+        
+        // 更新列表
+        const actualEnd = Math.max(sIdx, eIdx-1);
+        const listData = currentRankedData.map(item => {
+            const v1 = item.fullData[sIdx], v2 = item.fullData[actualEnd];
+            let p = -999; if(v1&&v2) p = (v2-v1)/v1;
+            return { name: item.name, pct: p };
+        });
+        listData.sort((a,b) => b.pct - a.pct);
+        currentViewData = listData;
+        renderList(listData);
+        updateVisuals(null);
     }
 
     function renderList(data) {
         const div = document.getElementById('rankList');
-        div.innerHTML = data.map(d => `
-            <div class="list-item ${selectedSeries.has(d.name)?'active-state':''}" onclick="toggleSel('${d.name}')">
-                <span>${d.name}</span>
-                <span style="color:${d.pct>=0?'#ff3b30':'#34c759'}">${(d.pct*100).toFixed(2)}%</span>
-            </div>
-        `).join('');
+        div.innerHTML = data.map((d, i) => {
+            const c = industryColors[d.name];
+            const active = selectedSeries.has(d.name) ? 'active-state' : '';
+            const dim = (selectedSeries.size>0 && !selectedSeries.has(d.name)) ? 'dimmed' : '';
+            const idxStr = activeMode === '__RANKING__' ? `${i+1}. ` : ''; // 只有排名模式显示序号
+            
+            return `<div class="list-item ${active} ${dim}" data-n="${d.name}"
+                onclick="toggleLock('${d.name}')" onmouseenter="applyHighlight('${d.name}')" onmouseleave="updateVisuals(null)">
+                <div class="idx-left">
+                    <div class="idx-dot" style="background:${c}"></div>
+                    <span>${idxStr}${d.name}</span>
+                </div>
+                <div class="${d.pct>=0?'up':'down'}">${d.pct!==-999?(d.pct*100).toFixed(2)+'%':'--'}</div>
+            </div>`;
+        }).join('');
     }
 
-    function toggleSel(name) {
-        if(selectedSeries.has(name)) selectedSeries.delete(name);
-        else selectedSeries.add(name);
-        updateUI();
-    }
-
-    function updateUI() {
-        document.getElementById('saveGroupBtn').style.display = selectedSeries.size > 0 ? 'flex' : 'none';
-        // 简单重绘列表高亮
-        document.querySelectorAll('.list-item').forEach(el => {
-            const txt = el.querySelector('span').innerText;
-            if(selectedSeries.has(txt)) el.classList.add('active-state');
-            else el.classList.remove('active-state');
+    // --- 交互逻辑 ---
+    function makeTooltip(params) {
+        if(!params.length) return '';
+        let s = params[0].axisValue + '<br>';
+        params.sort((a,b)=>b.value-a.value);
+        params.forEach(p => {
+            if(p.value==null) return;
+            const isDim = selectedSeries.size>0 && !selectedSeries.has(p.seriesName);
+            s += `<div style="color:${isDim?'#999':'#333'};font-weight:${isDim?'normal':'bold'}">
+                ${p.marker}${p.seriesName}: ${((p.value-1)*100).toFixed(2)}%</div>`;
         });
-        // 图表高亮逻辑简化
-        if(myChart) {
-            const op = myChart.getOption();
-            op.series.forEach(s => {
-                const isSel = selectedSeries.has(s.name);
-                const hasAny = selectedSeries.size > 0;
-                s.lineStyle.opacity = hasAny ? (isSel ? 1 : 0.2) : 1;
-                s.lineStyle.width = isSel ? 3 : (hasAny ? 1 : 2);
-                s.z = isSel ? 10 : 2;
-            });
-            myChart.setOption(op);
-        }
+        return s;
+    }
+    
+    function setupChartEvents() {
+        myChart.on('dataZoom', p => {
+            const opt = myChart.getOption();
+            const s = opt.dataZoom[0].startValue;
+            if(globalDates[s]) document.getElementById('startDate').value = globalDates[s];
+            updateChartData(s, opt.dataZoom[0].endValue);
+        });
+        myChart.getZr().on('click', e => { if(!e.target) toggleLock(null); });
+        myChart.on('click', p => { if(p.componentType==='series') toggleLock(p.seriesName); });
+        myChart.on('mouseover', p => { if(p.componentType==='series') applyHighlight(p.seriesName); });
+        myChart.on('mouseout', () => updateVisuals(null));
     }
 
-    function handleInputChange() { calcAndRender(false); }
-
-    // 初始化
-    loadConfig();
-    const now = new Date();
-    document.getElementById('endDate').valueAsDate = now;
-    const prev = new Date(); prev.setDate(now.getDate()-30);
-    document.getElementById('startDate').valueAsDate = prev;
+    function toggleLock(name) {
+        if(!name) selectedSeries.clear();
+        else { if(selectedSeries.has(name)) selectedSeries.delete(name); else selectedSeries.add(name); }
+        updateVisuals(null);
+        updateButtons();
+    }
     
-    // 启动
+    function applyHighlight(name) { updateVisuals(name); }
+
+    function updateVisuals(hoverName) {
+        const hasSel = selectedSeries.size>0;
+        const focus = hasSel || hoverName;
+        
+        // 顶部标签
+        const tags = document.getElementById('chart-tags');
+        if(hasSel) {
+            tags.innerHTML = Array.from(selectedSeries).map(n => {
+                const d = currentViewData.find(x=>x.name===n);
+                const c = industryColors[n];
+                const v = d && d.pct!==-999 ? (d.pct>0?'+':'')+(d.pct*100).toFixed(2)+'%' : '--';
+                return `<div class="chart-tag-chip" style="color:${c};border-color:${c}">
+                    <span style="background:${c};width:6px;height:6px;border-radius:50%"></span>${n} 
+                    <span style="background:${c};color:#fff;padding:0 3px;border-radius:2px;font-size:10px;margin-left:3px">${v}</span></div>`;
+            }).join('');
+        } else tags.innerHTML = '';
+
+        // 线条样式
+        myChart.setOption({
+            series: currentRankedData.map(item => {
+                const isHigh = selectedSeries.has(item.name) || item.name===hoverName;
+                const op = !focus ? 1 : (isHigh ? 1 : 0.1);
+                const wd = !focus ? 2 : (isHigh ? 3 : 1);
+                return { lineStyle: { opacity: op, width: wd }, z: isHigh?10:2 };
+            })
+        });
+
+        // 列表样式
+        document.querySelectorAll('.list-item').forEach(el => {
+            const n = el.dataset.n;
+            el.className = `list-item ${selectedSeries.has(n)?'active-state':''} ${(focus && !selectedSeries.has(n) && n!==hoverName)?'dimmed':''}`;
+        });
+    }
+
+    function handleRankingInputChange() { calcAndRender(false); }
+
+    // --- GitHub 保存与删除 ---
+    async function ghReq(method, body = null) {
+        if(!GITHUB.token) throw new Error("请先配置 Token");
+        const url = `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.path}`;
+        const headers = { 'Authorization': `Bearer ${GITHUB.token}`, 'Accept': 'application/vnd.github.v3+json' };
+        
+        // 1. Get SHA
+        let sha = null, content = {};
+        try {
+            const r = await fetch(url, { headers, cache: 'no-store' });
+            if(r.ok) {
+                const j = await r.json();
+                sha = j.sha;
+                content = JSON.parse(decodeURIComponent(escape(window.atob(j.content))));
+            }
+        } catch(e){}
+
+        if(method === 'DELETE_KEY') {
+            const key = body.key;
+            delete content[key];
+            body = { message: `Delete group ${key}`, content: content };
+        } else if (method === 'PUT_KEY') {
+            content[body.key] = body.val;
+            body = { message: `Update group ${body.key}`, content: content };
+        }
+
+        const b64 = window.btoa(unescape(encodeURIComponent(JSON.stringify(body.content, null, 2))));
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${GITHUB.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: body.message, content: b64, sha: sha })
+        });
+        if(!res.ok) throw new Error("GitHub Request Failed");
+    }
+
+    async function saveCurrentSelection() {
+        const name = prompt("请输入新板块名称:", "自选组合");
+        if(!name) return;
+        const btn = document.getElementById('saveGroupBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            await ghReq('PUT_KEY', { key: name, val: Array.from(selectedSeries) });
+            alert("保存成功!");
+            selectedSeries.clear();
+            fetchData();
+        } catch(e) { alert(e.message); } 
+        finally { btn.innerHTML = '<i class="fas fa-save"></i> 保存'; }
+    }
+
+    async function deleteCurrentGroup() {
+        if(!confirm(`确定要删除板块【${activeGroupName}】吗？`)) return;
+        const btn = document.getElementById('delGroupBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            await ghReq('DELETE_KEY', { key: activeGroupName });
+            alert("删除成功");
+            activeMode = '__RANKING__';
+            fetchData();
+        } catch(e) { alert(e.message); }
+        finally { btn.innerHTML = '<i class="fas fa-trash"></i> 删除'; }
+    }
+
+    // Init
+    loadConfig();
+    const now = new Date(); document.getElementById('endDate').valueAsDate = now;
+    const prev = new Date(); prev.setDate(now.getDate()-30); document.getElementById('startDate').valueAsDate = prev;
+    window.addEventListener('resize', ()=>myChart&&myChart.resize());
     fetchData();
 
 </script>
