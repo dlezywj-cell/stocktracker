@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (板块专用版)</title>
+    <title>行业强弱追踪 (极致单行版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -20,38 +20,19 @@
         }
         
         html, body {
-            height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; position: fixed; 
+            height: 100%;
+            width: 100%;
+            overflow: hidden; 
+            overscroll-behavior: none; 
+            position: fixed; 
         }
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; 
-            background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; 
+            background: var(--bg); color: var(--text-main); margin: 0; 
+            display: flex; flex-direction: column; 
         }
         
-        /* --- 模态框样式 (设置面板) --- */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); z-index: 999; display: none;
-            align-items: center; justify-content: center; backdrop-filter: blur(2px);
-        }
-        .modal-overlay.active { display: flex; }
-        .modal-card {
-            background: #fff; width: 90%; max-width: 320px; border-radius: 16px; padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        .modal-title { font-weight: 700; font-size: 16px; margin-bottom: 15px; color: var(--text-main); }
-        .form-group { margin-bottom: 12px; }
-        .form-label { display: block; font-size: 12px; color: var(--text-sec); margin-bottom: 4px; }
-        .form-input { 
-            width: 100%; padding: 8px; border: 1px solid #e5e5e5; border-radius: 8px; 
-            font-size: 14px; box-sizing: border-box; outline: none;
-        }
-        .form-input:focus { border-color: var(--primary); }
-        .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-cancel { flex: 1; padding: 10px; border: none; background: #f2f2f2; border-radius: 8px; color: #666; font-weight: 600; cursor: pointer; }
-        .btn-confirm { flex: 1; padding: 10px; border: none; background: var(--primary); border-radius: 8px; color: white; font-weight: 600; cursor: pointer; }
-
-        /* --- 主界面样式 --- */
         header { 
             background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5;
             height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
@@ -61,40 +42,25 @@
         .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
         .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); }
-        .sync-dot.error { background: var(--danger); }
         
-        .header-btn {
-            background: none; border: none; color: var(--text-sec); cursor: pointer; font-size: 16px; margin-left: 10px; padding: 5px;
-        }
-        .header-btn:hover { color: var(--primary); }
-
         .control-panel {
             background: var(--bg); padding: 8px 12px; flex-shrink: 0;
-            display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #e5e5e5; z-index: 10;
+            display: flex; 
+            align-items: center; 
+            flex-wrap: nowrap; 
+            overflow-x: auto;
+            gap: 10px;
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+            border-bottom: 1px solid #e5e5e5; 
+            z-index: 10;
         }
-        
-        .control-row-top {
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 10px;
-            width: 100%;
-        }
-
-        .group-scroll-container {
-            display: flex; gap: 8px; overflow-x: auto; width: 100%; padding-bottom: 2px;
-            scrollbar-width: none; -ms-overflow-style: none; min-height: 28px;
-        }
-        .group-scroll-container::-webkit-scrollbar { display: none; }
-
-        .group-chip {
-            padding: 4px 12px; border-radius: 14px; font-size: 12px; background: #fff; color: var(--text-sec);
-            border: 1px solid #e5e5e5; white-space: nowrap; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
-        }
-        .group-chip.active {
-            background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 500;
-        }
-        .group-chip.empty-tip { border: 1px dashed #ccc; color: #999; background: transparent; cursor: default; }
+        .control-panel::-webkit-scrollbar { display: none; }
 
         .input-group { 
-            display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; 
+            display: flex; align-items: center; gap: 6px; 
+            font-size: 13px; color: var(--text-sec); 
+            flex-shrink: 0; 
         }
         
         .date-inp {
@@ -102,51 +68,97 @@
             padding: 4px 6px; border-radius: 6px; font-size: 12px; font-family: inherit;
             outline: none; text-align: center; width: 105px;
         }
-        
-        .btn-save {
-            background: var(--success); color: white; border: none; padding: 0 12px; height: 28px;
-            border-radius: 14px; cursor: pointer; display: none; align-items: center; gap: 6px; font-size: 12px;
-            flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 500;
-            margin-left: auto; /* 推到最右边 */
+        .num-inp {
+            border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; 
+            width: 36px; text-align: center; font-size: 12px;
         }
-        .btn-save:active { opacity: 0.8; transform: scale(0.98); }
-
+        .btn-icon {
+            background: var(--primary); color: white; border: none; width: 28px; height: 28px;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        
         @media (max-width: 768px) {
-            .control-panel { padding: 8px 5px; gap: 6px; }
-            .date-inp { width: 88px; font-size: 11px; padding: 4px 2px; }
+            .control-panel {
+                padding: 8px 5px; 
+                gap: 5px; 
+                justify-content: space-between; 
+            }
+            .input-group {
+                gap: 3px; 
+            }
+            .mobile-label {
+                display: none;
+            }
+            .date-inp {
+                width: 88px; 
+                font-size: 11px;
+                padding: 4px 2px;
+            }
+            .num-inp {
+                width: 30px;
+                padding: 4px 2px;
+            }
         }
 
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
         
         .chart-wrapper {
             flex: 1; background: var(--card); border-radius: var(--radius);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; position: relative; min-width: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column; position: relative; min-width: 0;
         }
         
+        /* --- 新增样式：顶部标签容器 --- */
         .chart-tags-container {
-            position: absolute; top: 10px; left: 55px; right: 20px;
-            height: auto; min-height: 30px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-            pointer-events: none; z-index: 5;
+            position: absolute;
+            top: 10px;
+            left: 55px; /* 避开左侧刻度 */
+            right: 20px;
+            height: auto;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            pointer-events: none; /* 让鼠标穿透，不影响图表操作 */
+            z-index: 5;
         }
 
         .chart-tag-chip {
-            background: rgba(255, 255, 255, 0.95); border: 1px solid #e5e5e5;
-            padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;
-            display: flex; align-items: center; gap: 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: all 0.2s; pointer-events: auto;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e5e5e5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            pointer-events: auto; /* 标签本身可以响应点击(虽然这里没加点击事件) */
         }
+        /* --------------------------- */
 
         #chart-container { width: 100%; height: 100%; }
         
         .list-wrapper {
             width: 260px; background: var(--card); border-radius: var(--radius);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
         }
 
         .list-header {
-            padding: 12px 16px; font-size: 13px; font-weight: 700; color: var(--text-main);
-            background: var(--header-bg); border-top: 1px solid #e5e5e5; border-bottom: 1px solid #dcdcdc; 
-            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 1;
+            padding: 12px 16px; 
+            font-size: 13px; 
+            font-weight: 700; 
+            color: var(--text-main);
+            background: var(--header-bg); 
+            border-top: 1px solid #e5e5e5;
+            border-bottom: 1px solid #dcdcdc; 
+            display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; z-index: 1;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
 
@@ -155,9 +167,11 @@
         .list-body::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
         
         .list-item {
-            padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 16px; 
+            display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; 
-            transition: transform 0.2s, background 0.2s, opacity 0.2s; opacity: 1;
+            transition: transform 0.2s, background 0.2s, opacity 0.2s; 
+            opacity: 1;
         }
         .list-item:hover { background: #f9f9f9; }
         .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); opacity: 1 !important;}
@@ -181,12 +195,53 @@
         .loading-mask.show { opacity: 1; pointer-events: auto; }
 
         @media (max-width: 768px) {
-            .workspace { flex-direction: column; height: 100%; padding: 0; gap: 0; overflow: hidden; }
-            .chart-wrapper { flex: 0 0 55vh; height: auto; min-height: 250px; border-radius: 0; box-shadow: none; border-bottom: none; z-index: 2; }
-            .chart-tags-container { left: 10px; top: 5px; font-size: 11px; }
-            .list-wrapper { width: 100%; flex: 1; height: auto; border-radius: 0; box-shadow: none; border-top: none; display: flex; flex-direction: column; overflow: hidden; }
-            .list-header { font-size: 12px; padding: 8px 12px; background: #f0f2f5; border-top: 1px solid #dcdcdc; }
-            .list-body { flex: 1; overflow-y: auto; padding-bottom: 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+            .workspace { 
+                flex-direction: column; 
+                height: 100%; 
+                padding: 0; 
+                gap: 0; 
+                overflow: hidden; 
+            }
+            .chart-wrapper { 
+                flex: 0 0 55vh; 
+                height: auto;
+                min-height: 250px; 
+                border-radius: 0; 
+                box-shadow: none;
+                border-bottom: none; 
+                z-index: 2; 
+            }
+            
+            .chart-tags-container {
+                left: 10px;
+                top: 5px;
+                font-size: 11px;
+            }
+
+            .list-wrapper { 
+                width: 100%; 
+                flex: 1; 
+                height: auto; 
+                border-radius: 0; 
+                box-shadow: none; 
+                border-top: none;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden; 
+            }
+            .list-header {
+                font-size: 12px;
+                padding: 8px 12px;
+                background: #f0f2f5; 
+                border-top: 1px solid #dcdcdc; 
+            }
+            .list-body { 
+                flex: 1; 
+                overflow-y: auto; 
+                padding-bottom: 20px;
+                -webkit-overflow-scrolling: touch; 
+                overscroll-behavior: contain; 
+            }
         }
     </style>
 </head>
@@ -196,138 +251,79 @@
     <div class="sync-info">
         <div id="syncDot" class="sync-dot"></div>
         <span id="updateTime">连接中...</span>
-        <button class="header-btn" onclick="openSettings()" title="设置"><i class="fas fa-cog"></i></button>
     </div>
 </header>
 <div class="control-panel">
-    <!-- 第一行：日期控制 + 保存按钮 -->
-    <div class="control-row-top">
-        <div class="input-group">
-            <span class="mobile-label">时间范围:</span>
-            <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
-            <span>-</span>
-            <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
-        </div>
-        
-        <!-- 保存板块按钮 (动态显示) -->
-        <button id="saveGroupBtn" class="btn-save" onclick="saveCurrentSelection()">
-            <i class="fas fa-save"></i> 保存为板块
-        </button>
+    <div class="input-group">
+        <span class="mobile-label">选股范围:</span>
+        <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
+        <span>-</span>
+        <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
     </div>
-    
-    <!-- 第二行：板块列表 -->
-    <div class="group-scroll-container" id="group-tabs">
-        <span class="group-chip empty-tip">加载中...</span>
+    <div class="input-group">
+        <span class="mobile-label">排名:</span>
+        <input type="number" id="rankStart" class="num-inp" value="1" min="1" onchange="handleRankingInputChange()">
+        <span>-</span>
+        <input type="number" id="rankEnd" class="num-inp" value="10" min="1" onchange="handleRankingInputChange()">
+        <button class="btn-icon" onclick="fetchData()" title="刷新"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
     </div>
 </div>
 <div class="workspace">
     <div class="chart-wrapper">
+        <!-- 标签显示层 -->
         <div id="chart-tags" class="chart-tags-container"></div>
+
         <div class="loading-mask" id="loader"><span><i class="fas fa-spinner fa-spin"></i> 数据加载中...</span></div>
         <div id="chart-container"></div>
     </div>
     <div class="list-wrapper">
         <div class="list-header">
             <span>行业名称</span>
-            <span style="font-weight:normal;color:#888;font-size:10px;margin-left:4px;">(区间涨幅)</span>
-            <span>收益率</span>
+            <span style="font-weight:normal;color:#888;font-size:10px;margin-left:4px;">(按涨幅排序)</span>
+            <span>区间收益率</span>
         </div>
         <div class="list-body" id="rankList"></div>
     </div>
 </div>
 
-<!-- 设置模态框 -->
-<div class="modal-overlay" id="settingModal">
-    <div class="modal-card">
-        <div class="modal-title">配置 GitHub 存储</div>
-        <div class="form-group">
-            <label class="form-label">用户名 (User/Org)</label>
-            <input type="text" id="cfgOwner" class="form-input" placeholder="例如: dlezywj-cell">
-        </div>
-        <div class="form-group">
-            <label class="form-label">仓库名 (Repository)</label>
-            <input type="text" id="cfgRepo" class="form-input" placeholder="例如: stocktracker">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Access Token (需勾选 repo 权限)</label>
-            <input type="password" id="cfgToken" class="form-input" placeholder="ghp_xxxxxxxxxxxx">
-        </div>
-        <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeSettings()">取消</button>
-            <button class="btn-confirm" onclick="saveSettings()">保存并刷新</button>
-        </div>
-    </div>
-</div>
-
 <script>
-    // -------------------------------------------------------------------------
-    // 配置管理 - 这里已经帮你填好了默认值
-    // -------------------------------------------------------------------------
-    let GITHUB_CONFIG = {
-        owner: '',
-        repo: '',
-        path: 'groups.json',
-        token: ''
-    };
-
-    function loadConfig() {
-        // 自动读取，如果没有则使用你的默认仓库信息
-        GITHUB_CONFIG.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell';
-        GITHUB_CONFIG.repo = localStorage.getItem('gh_repo') || 'stocktracker';
-        GITHUB_CONFIG.token = localStorage.getItem('gh_token') || '';
-        
-        // 填充到设置弹窗
-        document.getElementById('cfgOwner').value = GITHUB_CONFIG.owner;
-        document.getElementById('cfgRepo').value = GITHUB_CONFIG.repo;
-        document.getElementById('cfgToken').value = GITHUB_CONFIG.token;
-    }
-
-    function openSettings() { document.getElementById('settingModal').classList.add('active'); }
-    function closeSettings() { document.getElementById('settingModal').classList.remove('active'); }
-    
-    function saveSettings() {
-        const owner = document.getElementById('cfgOwner').value.trim();
-        const repo = document.getElementById('cfgRepo').value.trim();
-        const token = document.getElementById('cfgToken').value.trim();
-
-        if(!owner || !repo) { alert("用户名和仓库名不能为空"); return; }
-
-        localStorage.setItem('gh_owner', owner);
-        localStorage.setItem('gh_repo', repo);
-        localStorage.setItem('gh_token', token);
-
-        loadConfig();
-        closeSettings();
-        fetchData(); // 重新加载数据
-    }
-
-    // -------------------------------------------------------------------------
-    // 全局变量
-    // -------------------------------------------------------------------------
     let rawData = null; 
-    let groupsData = {}; 
-    let activeGroupName = null; 
-
     let myChart = null;
     let selectedSeries = new Set();
+    let currentRankedData = []; 
     let globalAllDates = [];
     let visibilityState = {};
-    let currentRankedData = []; 
-    let currentViewData = [];
+    let currentViewData = []; // 用于存储当前视野下的数据，供标签使用
     
     // -------------------------------------------------------------------------
-    // 辅助工具
+    // 色表
     // -------------------------------------------------------------------------
-    function utf8_to_b64(str) { return window.btoa(unescape(encodeURIComponent(str))); }
-    function b64_to_utf8(str) { return decodeURIComponent(escape(window.atob(str))); }
-
     const colorPalette = [
-        '#FF3030', '#007AFF', '#00C040', '#FFD700', '#9C27B0', 
-        '#00CED1', '#FF9500', '#FF1493', '#8B4513', '#708090', 
-        '#000000', '#ADFF2F', '#4B0082', '#FF4500', '#2E8B57'
+        '#FF3030', // 红
+        '#007AFF', // 蓝 (红蓝对比)
+        '#00C040', // 绿 (三原色)
+        '#FFD700', // 金黄 (亮色)
+        '#9C27B0', // 紫
+        '#00CED1', // 青
+        '#FF9500', // 橙
+        '#FF1493', // 深粉
+        '#8B4513', // 棕
+        '#708090', // 灰
+        '#000000', // 黑
+        '#ADFF2F', // 绿黄
+        '#4B0082', // 靛青
+        '#FF4500', // 红橙
+        '#2E8B57', // 海藻绿
+        '#800000', // 栗色
+        '#4682B4', // 钢蓝
+        '#D2691E', // 巧克力
+        '#000080', // 深蓝
+        '#DC143C'  // 猩红
     ];
+    
     let industryColors = {}; 
 
+    // 新增函数：根据当前“可见”的曲线，重新分配颜色
     function reassignColors() {
         let visibleCount = 0;
         currentRankedData.forEach(item => {
@@ -335,7 +331,7 @@
                 industryColors[item.name] = colorPalette[visibleCount % colorPalette.length];
                 visibleCount++;
             } else {
-                industryColors[item.name] = '#cccccc';
+                industryColors[item.name] = '#cccccc'; // 隐藏时用淡灰
             }
         });
     }
@@ -348,267 +344,86 @@
         document.getElementById('startDate').valueAsDate = start;
     }
 
-    // -------------------------------------------------------------------------
-    // 数据获取
-    // -------------------------------------------------------------------------
     async function fetchData() {
         const loader = document.getElementById('loader');
         const dot = document.getElementById('syncDot');
         const timeTxt = document.getElementById('updateTime');
         loader.classList.add('show');
         dot.className = 'sync-dot loading';
-        timeTxt.innerText = '连接中';
-        
+        timeTxt.innerText = '更新中';
         try {
-            // 1. 获取行情数据 (本地或远程)
-            const dataRes = await fetch('industry_data.json?t=' + Date.now());
-            if (!dataRes.ok) throw new Error("行情数据加载失败");
-            rawData = await dataRes.json();
+            const response = await fetch('industry_data.json?t=' + Date.now());
+            if (!response.ok) throw new Error("Status: " + response.status);
+            rawData = await response.json();
             globalAllDates = rawData.dates;
-            
-            // 2. 获取板块配置 (通过 GitHub API 以支持私有仓库读取)
-            let loadedGroups = null;
-            
-            if (GITHUB_CONFIG.token && GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
-                const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
-                try {
-                    const ghRes = await fetch(apiUrl, {
-                        headers: { 
-                            'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        },
-                        cache: 'no-store'
-                    });
-                    
-                    if (ghRes.ok) {
-                        const fileData = await ghRes.json();
-                        loadedGroups = JSON.parse(b64_to_utf8(fileData.content));
-                        dot.className = 'sync-dot online';
-                        timeTxt.innerText = "已连接 GitHub";
-                    } else if (ghRes.status === 404) {
-                        // 文件不存在是正常的，说明还没创建
-                        loadedGroups = {}; 
-                        dot.className = 'sync-dot online';
-                        timeTxt.innerText = "就绪 (未建组)";
-                    } else {
-                        // Token 错误或其他 API 错误
-                         console.warn(`GitHub API Error: ${ghRes.status}`);
-                    }
-                } catch (e) {
-                    console.warn("GitHub API Fetch Failed, trying direct access...", e);
-                }
-            }
-
-            // 降级尝试：直接读取 groups.json (如果 Token 没填，或者 API 失败)
-            if (loadedGroups === null) {
-                try {
-                    const fallbackRes = await fetch('groups.json?t=' + Date.now());
-                    if (fallbackRes.ok) {
-                        loadedGroups = await fallbackRes.json();
-                        dot.className = 'sync-dot online';
-                        timeTxt.innerText = "读取模式";
-                    } else {
-                        loadedGroups = {}; // 也没文件，默认为空
-                        if(!GITHUB_CONFIG.token) {
-                            dot.className = 'sync-dot error';
-                            timeTxt.innerText = "需配置Token";
-                        }
-                    }
-                } catch(e) { loadedGroups = {}; }
-            }
-            
-            groupsData = loadedGroups;
-            renderGroupTabs();
-
-            // 默认选中第一个板块，或者显示全部
-            const groupNames = Object.keys(groupsData);
-            if (activeGroupName && groupsData[activeGroupName]) {
-                renderGroupView(activeGroupName);
-            } else if (groupNames.length > 0) {
-                switchGroup(groupNames[0]);
-            } else {
-                // 一个板块都没有，显示空状态
-                renderEmptyState();
-            }
-
+            dot.className = 'sync-dot online';
+            timeTxt.innerText = (rawData.last_update || '未知').split(' ')[0];
+            calculateRankAndRender(true); 
         } catch (error) {
             console.error(error);
-            dot.className = 'sync-dot error';
-            timeTxt.innerText = '数据错误';
+            dot.className = 'sync-dot';
+            dot.style.background = 'var(--danger)';
+            timeTxt.innerText = '失败';
         } finally {
             loader.classList.remove('show');
         }
     }
 
-    // -------------------------------------------------------------------------
-    // 逻辑控制
-    // -------------------------------------------------------------------------
-    function renderGroupTabs() {
-        const container = document.getElementById('group-tabs');
-        const names = Object.keys(groupsData);
-        
-        if (names.length === 0) {
-            container.innerHTML = `<span class="group-chip empty-tip">暂无板块，请在下方列表点击选中指数后保存</span>`;
-            return;
-        }
-
-        let html = '';
-        // 渲染板块按钮
-        names.forEach(gName => {
-            const isActive = (gName === activeGroupName) ? 'active' : '';
-            html += `<div class="group-chip ${isActive}" onclick="switchGroup('${gName}', this)">${gName}</div>`;
-        });
-        
-        // 增加一个“显示全部”的按钮，方便去选新的
-        const allActive = (activeGroupName === '__ALL__') ? 'active' : '';
-        html += `<div class="group-chip ${allActive}" onclick="switchGroup('__ALL__', this)" style="border-style:dashed;">+ 新建/浏览全部</div>`;
-        
-        container.innerHTML = html;
-    }
-
-    function switchGroup(groupName, el) {
-        activeGroupName = groupName;
-        renderGroupTabs(); // 重新渲染以更新高亮
-        
-        if (groupName === '__ALL__') {
-            // 显示全部数据，按字母或默认顺序，方便用户挑选
-            const allNames = Object.keys(rawData.data);
-            processDataAndRender(allNames, false);
-        } else {
-            const targetNames = groupsData[groupName];
-            if (targetNames) processDataAndRender(targetNames, false);
-        }
-    }
-
-    function renderEmptyState() {
-        activeGroupName = '__ALL__'; // 默认进入全览模式
-        renderGroupTabs();
-        const allNames = Object.keys(rawData.data);
-        processDataAndRender(allNames, true);
-    }
-
-    // 处理数据并渲染图表
-    function processDataAndRender(targetNames, isInit) {
+    function calculateRankAndRender(isInit = false) {
+        if (!rawData) return;
         selectedSeries.clear();
         visibilityState = {};
         industryColors = {}; 
+        
         document.getElementById('chart-tags').innerHTML = '';
-        updateVisuals(null); // 重置按钮状态
-
-        currentRankedData = [];
-        targetNames.forEach(name => {
-            if (rawData.data[name]) {
-                currentRankedData.push({
-                    name: name,
-                    fullData: rawData.data[name]
-                });
-                visibilityState[name] = true;
-            }
-        });
-
-        reassignColors();
 
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
+        const nStart = parseInt(document.getElementById('rankStart').value);
+        const nEnd = parseInt(document.getElementById('rankEnd').value);
+
         let sIdx = globalAllDates.findIndex(d => d >= sDate);
         if (sIdx === -1) sIdx = 0;
         let eIdx = globalAllDates.findIndex(d => d > eDate);
         if (eIdx === -1) eIdx = globalAllDates.length;
 
-        initChart(isInit ? sIdx : null, isInit ? eIdx : null);
+        let tempRank = [];
+        Object.keys(rawData.data).forEach(name => {
+            const prices = rawData.data[name];
+            if (!prices || prices.length <= sIdx) return;
+            
+            let startPrice = prices[sIdx];
+            if (!startPrice || startPrice === 0) {
+                for(let k = sIdx; k < Math.min(prices.length, eIdx); k++) {
+                     if(prices[k] && prices[k] !== 0) {
+                         startPrice = prices[k];
+                         break;
+                     }
+                }
+            }
+
+            const endPrice = prices[Math.min(prices.length-1, eIdx-1)];
+            
+            if (startPrice && endPrice && startPrice !== 0) {
+                const pct = (endPrice - startPrice) / startPrice;
+                tempRank.push({ name: name, pct: pct, fullData: prices });
+            }
+        });
+
+        tempRank.sort((a, b) => b.pct - a.pct);
+        currentRankedData = tempRank.slice(nStart - 1, nEnd);
         
-        if (!isInit && myChart) {
-             const opt = myChart.getOption();
-             if (opt.dataZoom && opt.dataZoom[0]) {
-                 updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
-             } else {
-                 updateChartAndList(sIdx, eIdx);
-             }
-        }
+        // 初始化可见性
+        currentRankedData.forEach((item) => {
+            visibilityState[item.name] = true;
+        });
+
+        // 核心：应用动态颜色分配
+        reassignColors();
+
+        initChart(isInit ? sIdx : null, isInit ? eIdx : null);
     }
 
-    // -------------------------------------------------------------------------
-    // 保存功能 (GitHub API)
-    // -------------------------------------------------------------------------
-    async function saveCurrentSelection() {
-        if (selectedSeries.size === 0) return;
-
-        if (!GITHUB_CONFIG.token || !GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) {
-            alert("请先点击右上角齿轮图标，配置 Token！");
-            openSettings();
-            return;
-        }
-
-        const groupName = prompt("请输入新板块名称 (例如: 消费白马):");
-        if (!groupName) return;
-
-        const indices = Array.from(selectedSeries);
-        const saveBtn = document.getElementById('saveGroupBtn');
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
-        saveBtn.disabled = true;
-
-        try {
-            const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
-            
-            // 1. 尝试获取现有文件 (为了拿到 sha)
-            let sha = null;
-            let currentContent = {};
-            
-            const getRes = await fetch(apiUrl, {
-                headers: { 
-                    'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                },
-                cache: 'no-store'
-            });
-
-            if (getRes.ok) {
-                const fileData = await getRes.json();
-                sha = fileData.sha;
-                try { currentContent = JSON.parse(b64_to_utf8(fileData.content)); } catch (e) {}
-            }
-
-            // 2. 更新内容
-            currentContent[groupName] = indices;
-            
-            // 3. 写入文件 (创建或更新)
-            const newContentBase64 = utf8_to_b64(JSON.stringify(currentContent, null, 2));
-            
-            const putRes = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${GITHUB_CONFIG.token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: `Update group: ${groupName}`,
-                    content: newContentBase64,
-                    sha: sha // 如果sha是null，GitHub会创建新文件
-                })
-            });
-
-            if (!putRes.ok) {
-                const err = await putRes.json();
-                throw new Error(err.message || "Upload failed");
-            }
-
-            alert(`板块【${groupName}】保存成功！`);
-            selectedSeries.clear();
-            updateVisuals(null);
-            fetchData(); // 刷新数据
-
-        } catch (error) {
-            alert("保存失败: " + error.message);
-        } finally {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // 图表与交互 (复用)
-    // -------------------------------------------------------------------------
     function initChart(startIdx, endIdx) {
         if (!myChart) {
             myChart = echarts.init(document.getElementById('chart-container'));
@@ -621,14 +436,15 @@
             smooth: true,
             showSymbol: false, 
             triggerLineEvent: true,
-            lineStyle: { width: 2, color: industryColors[item.name] },
+            lineStyle: { width: 2, color: industryColors[item.name] }, // 显式指定颜色
             data: visibilityState[item.name] ? item.fullData : [], 
             emphasis: { disabled: true },
             z: 2,
-            itemStyle: { color: industryColors[item.name] }
+            itemStyle: { color: industryColors[item.name] } // 显式指定颜色
         }));
 
-        let startPercent = 0; let endPercent = 100;
+        let startPercent = 0;
+        let endPercent = 100;
         if (startIdx !== null && endIdx !== null && globalAllDates.length > 0) {
             startPercent = (startIdx / globalAllDates.length) * 100;
             endPercent = (endIdx / globalAllDates.length) * 100;
@@ -640,69 +456,103 @@
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'line' },
+                z: 100,
                 formatter: function(params) {
                     if (!params.length) return '';
                     let html = params[0].axisValue + '<br/>';
                     params.sort((a,b) => b.value - a.value);
                     params.forEach(p => {
                         if (p.value === undefined || p.value === null) return;
+                        // 这里只是 Tooltip 的样式，不影响线条锁定
                         const isDimmed = selectedSeries.size > 0 && !selectedSeries.has(p.seriesName);
-                        const dotOpacity = isDimmed ? '0.3' : '1';
-                        const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
+                        
                         const textColor = isDimmed ? '#999' : '#333';
                         const fontWeight = isDimmed ? 'normal' : 'bold';
-                        html += `<div style="color:${textColor};font-weight:${fontWeight}">
-                                    <span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>
-                                    ${p.seriesName}: ${valStr}
+                        const dotOpacity = isDimmed ? '0.3' : '1';
+                        const colorDot = `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:8px;height:8px;background-color:${p.color};opacity:${dotOpacity}"></span>`;
+                        const valStr = ((p.value - 1) * 100).toFixed(2) + '%';
+                        html += `<div style="color:${textColor}; font-weight:${fontWeight}">
+                                    ${colorDot}${p.seriesName}: ${valStr}
                                  </div>`;
                     });
                     return html;
                 }
             },
             xAxis: {
-                type: 'category', data: globalAllDates, boundaryGap: false,
+                type: 'category', 
+                data: globalAllDates,
+                boundaryGap: false,
                 axisLine: { lineStyle: { color: '#eee' } },
                 axisLabel: { color: '#999', fontSize: 10 }
             },
             yAxis: {
-                type: 'value', scale: true, splitLine: { lineStyle: { color: '#f5f5f7' } },
+                type: 'value', 
+                scale: true, 
+                splitLine: { lineStyle: { color: '#f5f5f7' } },
                 axisLabel: { color: '#999', fontSize: 10, formatter: (val) => ((val-1)*100).toFixed(0) + '%' }
             },
             dataZoom: [
-                { type: 'slider', show: true, xAxisIndex: 0, top: 5, height: 20, borderColor: 'transparent', handleSize: '80%', start: startPercent, end: endPercent },
-                { type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }
+                {
+                    type: 'slider',
+                    show: true,
+                    xAxisIndex: 0,
+                    top: 5,
+                    bottom: undefined, 
+                    height: 20,
+                    borderColor: 'transparent',
+                    handleSize: '80%',
+                    start: startPercent,
+                    end: endPercent
+                },
+                {
+                    type: 'inside',
+                    xAxisIndex: 0,
+                    zoomOnMouseWheel: true,
+                    moveOnMouseMove: true
+                }
             ],
             series: series
         };
 
         myChart.setOption(option, true);
+        
         if (startIdx === null) {
             const opt = myChart.getOption();
-            startIdx = Math.floor(globalAllDates.length * opt.dataZoom[0].start / 100);
+            const sPct = opt.dataZoom[0].start;
+            startIdx = Math.floor(globalAllDates.length * sPct / 100);
         }
         if (endIdx === null) endIdx = globalAllDates.length;
+
         updateChartAndList(startIdx, endIdx);
     }
 
     function updateChartAndList(sIdx, eIdx) {
-        if (!globalAllDates.length) return;
         sIdx = Math.max(0, Math.min(sIdx, globalAllDates.length - 1));
         eIdx = Math.min(eIdx, globalAllDates.length); 
         const actualEndIdx = Math.max(sIdx, eIdx - 1); 
 
         const newSeries = currentRankedData.map(item => {
-            if (!visibilityState[item.name]) return { data: [] };
+            if (!visibilityState[item.name]) {
+                return { data: [] };
+            }
+
             let basePrice = item.fullData[sIdx];
-            if (!basePrice) {
+            if (!basePrice || basePrice === 0) {
                 for(let i = sIdx; i < item.fullData.length; i++) {
-                    if(item.fullData[i]) { basePrice = item.fullData[i]; break; }
+                    if(item.fullData[i] && item.fullData[i] !== 0) { 
+                        basePrice = item.fullData[i]; 
+                        break; 
+                    }
                 }
             }
             if (!basePrice) return { data: item.fullData.map(() => null) };
+
             const processedData = item.fullData.map((p, i) => {
                 if (i < sIdx || !p) return null;
                 return parseFloat((p / basePrice).toFixed(4));
             });
+            
+            // 核心修改：更新数据时，同时强制更新颜色
             return { 
                 data: processedData,
                 itemStyle: { color: industryColors[item.name] },
@@ -710,19 +560,30 @@
             };
         });
         
-        myChart.setOption({ series: newSeries, dataZoom: [{ startValue: sIdx, endValue: eIdx }] });
+        myChart.setOption({ 
+            series: newSeries,
+            dataZoom: [{ startValue: sIdx, endValue: eIdx }] 
+        });
 
         const sortedList = currentRankedData.map(item => {
             const startP = item.fullData[sIdx];
             const endP = item.fullData[actualEndIdx];
             let currentPct = -999; 
-            if (startP && endP) currentPct = (endP - startP) / startP;
-            return { name: item.name, currentPct: currentPct };
+
+            if (startP && endP && startP !== 0) {
+                currentPct = (endP - startP) / startP;
+            }
+            return {
+                name: item.name,
+                currentPct: currentPct
+            };
         });
 
         currentViewData = sortedList;
         sortedList.sort((a, b) => b.currentPct - a.currentPct);
         renderRankList(sortedList);
+        
+        // 如果有锁定或悬停状态，确保视觉效果正确
         updateVisuals(null);
     }
 
@@ -731,15 +592,19 @@
         let html = '';
         sortedData.forEach((item, index) => {
             const color = industryColors[item.name];
-            let pctStr = '--'; let cls = '';
+            let pctStr = '--';
+            let cls = '';
+            
             if (item.currentPct !== -999) {
                 pctStr = (item.currentPct * 100).toFixed(2) + '%';
                 cls = item.currentPct >= 0 ? 'up' : 'down';
             }
 
             let itemClass = 'list-item';
-            if (!visibilityState[item.name]) itemClass += ' unchecked';
-            else if (selectedSeries.size > 0) {
+            if (!visibilityState[item.name]) {
+                itemClass += ' unchecked';
+            } else if (selectedSeries.size > 0) {
+                // 初始化时如果已经被锁定，就加 active，否则 dim
                 if (selectedSeries.has(item.name)) itemClass += ' active-state';
                 else itemClass += ' dimmed';
             }
@@ -750,13 +615,14 @@
                  onmouseenter="applyHighlight('${item.name}')"
                  onmouseleave="clearHighlight()"
                  onclick="toggleLock('${item.name}')">
+                
                 <div class="idx-left-group">
                     <input type="checkbox" class="idx-chk" 
                            ${visibilityState[item.name] ? 'checked' : ''}
                            onclick="event.stopPropagation(); toggleVisibility('${item.name}')">
                     <div class="idx-name">
                         <div class="idx-dot" style="background:${color}"></div>
-                        ${item.name}
+                        ${index + 1}. ${item.name}
                     </div>
                 </div>
                 <div class="idx-val ${cls}">${item.currentPct >= 0 ? '+' : ''}${pctStr}</div>
@@ -767,104 +633,178 @@
 
     function toggleVisibility(name) {
         visibilityState[name] = !visibilityState[name];
-        if (!visibilityState[name] && selectedSeries.has(name)) selectedSeries.delete(name);
+        
+        if (!visibilityState[name] && selectedSeries.has(name)) {
+            selectedSeries.delete(name);
+        }
+
+        // 核心：每次勾选/取消，都重新分配颜色，保证可见线条对比度最大
         reassignColors();
+
         const opt = myChart.getOption();
-        updateChartAndList(opt.dataZoom[0].startValue, opt.dataZoom[0].endValue);
+        const startValue = opt.dataZoom[0].startValue;
+        const endValue = opt.dataZoom[0].endValue;
+        updateChartAndList(startValue, endValue);
     }
 
     function setupEvents() {
         myChart.on('dataZoom', function(params) {
             const opt = myChart.getOption();
-            let start = opt.dataZoom[0].startValue;
-            let end = opt.dataZoom[0].endValue;
-            if (start != null && globalAllDates[start]) {
-                document.getElementById('startDate').value = globalAllDates[start];
+            
+            const startPct = opt.dataZoom[0].start;
+            const totalLen = globalAllDates.length;
+            let sIdx = Math.floor(totalLen * startPct / 100);
+
+            const fixedEndDate = document.getElementById('endDate').value;
+            let eIdx = globalAllDates.findIndex(d => d > fixedEndDate);
+            if (eIdx === -1) eIdx = totalLen;
+            
+            if (sIdx >= eIdx) sIdx = Math.max(0, eIdx - 5);
+
+            updateChartAndList(sIdx, eIdx);
+
+            if (globalAllDates[sIdx]) {
+                document.getElementById('startDate').value = globalAllDates[sIdx];
             }
-            updateChartAndList(start, end);
         });
+
         myChart.getZr().on('click', function(params) { if (!params.target) toggleLock(null); });
-        myChart.on('click', function(params) { if (params.componentType === 'series') toggleLock(params.seriesName); });
+        
+        myChart.on('click', function(params) { 
+            if (params.componentType === 'series') toggleLock(params.seriesName); 
+        });
         myChart.on('mouseover', function(params) { if (params.componentType === 'series') applyHighlight(params.seriesName); });
         myChart.on('mouseout', function(params) { if (params.componentType === 'series') clearHighlight(); });
     }
 
     function handleRankingInputChange() {
-        if (activeGroupName) {
-            // 如果在板块模式下，只重新渲染当前板块
-            const targetNames = (activeGroupName === '__ALL__') ? Object.keys(rawData.data) : groupsData[activeGroupName];
-            processDataAndRender(targetNames, false);
-        }
+        calculateRankAndRender(false);
     }
 
     function applyHighlight(targetName) {
         if (!visibilityState[targetName]) return;
+        // 允许在锁定状态下继续触发悬停高亮
         updateVisuals(targetName);
     }
     
-    function clearHighlight() { updateVisuals(null); }
+    function clearHighlight() {
+        // 允许在锁定状态下恢复悬停前的状态
+        updateVisuals(null); 
+    }
     
     function toggleLock(targetName) {
         if (targetName && !visibilityState[targetName]) return;
-        if (targetName === null) selectedSeries.clear();
-        else {
-            if (selectedSeries.has(targetName)) selectedSeries.delete(targetName);
-            else selectedSeries.add(targetName);
+        
+        if (targetName === null) {
+            selectedSeries.clear();
+        } else {
+            if (selectedSeries.has(targetName)) {
+                selectedSeries.delete(targetName);
+            } else {
+                selectedSeries.add(targetName);
+            }
         }
         updateVisuals(null); 
     }
 
+    // 核心修改：逻辑合并，支持“锁定”与“悬停”的叠加
     function updateVisuals(hoverName) {
         const hasSelection = selectedSeries.size > 0;
         const hasHover = hoverName !== null;
-        const isFocusMode = hasSelection || hasHover;
-
-        const saveBtn = document.getElementById('saveGroupBtn');
-        saveBtn.style.display = hasSelection ? 'flex' : 'none';
+        // 只要有锁定 或者 有悬停，就进入“专注模式”（其他变淡）
+        const isFocusMode = hasSelection || hasHover; 
 
         const tagContainer = document.getElementById('chart-tags');
+        
+        // 1. 生成顶部 HTML 标签 (只显示【已锁定】的标签，避免鼠标快速移动时标签闪烁抖动)
         let tagsHtml = '';
         if (hasSelection) {
             selectedSeries.forEach(name => {
                 const dataItem = currentViewData.find(d => d.name === name);
+                // 容错处理
                 if (!dataItem) return;
+
                 const color = industryColors[name];
                 let valStr = '--';
-                if (dataItem.currentPct !== -999) valStr = (dataItem.currentPct >= 0 ? '+' : '') + ((dataItem.currentPct) * 100).toFixed(2) + '%';
+                let valColor = '#fff';
+                let valBg = color;
+
+                if (dataItem.currentPct !== -999) {
+                    valStr = ((dataItem.currentPct) * 100).toFixed(2) + '%';
+                    const sign = dataItem.currentPct >= 0 ? '+' : '';
+                    valStr = sign + valStr;
+                }
+
                 tagsHtml += `
                     <div class="chart-tag-chip" style="border-color:${color}; color:${color}">
                         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
                         <span>${name}</span>
-                        <span style="background:${color};color:#fff;padding:0 4px;border-radius:3px;font-size:11px;margin-left:2px;">${valStr}</span>
-                    </div>`;
+                        <span style="background:${valBg};color:${valColor};padding:0 4px;border-radius:3px;font-size:11px;margin-left:2px;">${valStr}</span>
+                    </div>
+                `;
             });
         }
         tagContainer.innerHTML = tagsHtml;
 
+        // 2. 更新图表线条样式
         const newStyles = currentRankedData.map(item => {
+            // 判断当前线条是否应该高亮（被锁定 或 被悬停）
             const isHighlighted = selectedSeries.has(item.name) || item.name === hoverName;
-            if (!isFocusMode) return { lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
-            if (isHighlighted) return { lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, z: 10, endLabel: { show: false } };
-            else return { lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, z: 2, endLabel: { show: false } };
+            
+            if (!isFocusMode) {
+                // 如果既没锁定也没悬停，恢复默认全显示状态（线宽2）
+                return { 
+                    lineStyle: { opacity: 1, width: 2, color: industryColors[item.name] }, 
+                    z: 2,
+                    endLabel: { show: false }
+                };
+            }
+
+            if (isHighlighted) {
+                // 高亮样式：不透明，加粗，层级最高
+                return { 
+                    lineStyle: { opacity: 1, width: 3, color: industryColors[item.name] }, 
+                    z: 10,
+                    endLabel: { show: false } 
+                };
+            } else {
+                // 非高亮样式：变淡，变细，层级低
+                return { 
+                    lineStyle: { opacity: 0.15, width: 1, color: industryColors[item.name] }, 
+                    z: 2,
+                    endLabel: { show: false } 
+                };
+            }
         });
+        
         myChart.setOption({ series: newStyles });
 
+        // 3. 更新右侧列表样式
         document.querySelectorAll('.list-item').forEach(el => {
             const name = el.dataset.name;
             if (!visibilityState[name]) return;
+
             el.classList.remove('active-state', 'dimmed');
-            if (!isFocusMode) return;
+
+            if (!isFocusMode) {
+                // 默认模式：什么都不加
+                return;
+            }
+
+            // 列表高亮逻辑同上
             if (selectedSeries.has(name) || name === hoverName) {
                 el.classList.add('active-state');
-                if (name === hoverName) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } else el.classList.add('dimmed');
+                // 如果是悬停触发的，且不在可视区，自动滚动（可选优化）
+                if (name === hoverName) {
+                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                el.classList.add('dimmed');
+            }
         });
     }
 
     window.addEventListener('resize', () => myChart && myChart.resize());
-    
-    // 初始化
-    loadConfig(); 
     initDate();
     fetchData(); 
 </script>
