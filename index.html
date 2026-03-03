@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>行业强弱追踪 (专业版)</title>
+    <title>行业强弱追踪 (诊断版)</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -12,344 +12,176 @@
             --primary: #007aff; --success: #34c759; --danger: #ff3b30; --radius: 12px;
             --header-bg: #f2f4f8; 
         }
+        html, body { height: 100%; width: 100%; overflow: hidden; margin: 0; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; flex-direction: column; }
+        header { background: #fff; border-bottom: 1px solid #e5e5e5; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; flex-shrink: 0; }
+        .app-title { font-weight: 700; font-size: 15px; }
         
-        html, body { height: 100%; width: 100%; overflow: hidden; overscroll-behavior: none; position: fixed; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; }
-        
-        /* 头部 */
-        header { background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #e5e5e5; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 10; }
-        .app-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
-        .sync-info { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 4px; }
-        .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
-        .sync-dot.online { background: var(--success); }
-        .header-btn { background: none; border: none; color: var(--text-sec); cursor: pointer; font-size: 16px; margin-left: 8px; padding: 4px; }
+        .control-panel { padding: 8px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e5e5e5; overflow-x: auto; }
+        .date-inp { border: 1px solid #ddd; padding: 4px; border-radius: 6px; font-size: 12px; }
 
-        /* 控制面板 */
-        .control-panel {
-            background: var(--bg); padding: 8px 12px; flex-shrink: 0;
-            display: flex; align-items: center; gap: 8px;
-            overflow-x: auto; white-space: nowrap; border-bottom: 1px solid #e5e5e5; z-index: 10;
-            scrollbar-width: none; 
-        }
-        .control-panel::-webkit-scrollbar { display: none; }
-
-        .input-group { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-sec); flex-shrink: 0; }
-        .date-inp { border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; font-size: 12px; width: 95px; outline: none; }
-        .num-inp { border: 1px solid #e5e5e5; background: #fff; padding: 4px; border-radius: 6px; width: 32px; text-align: center; font-size: 12px; outline: none; }
-
-        .group-select {
-            padding: 4px 24px 4px 8px; border-radius: 6px; border: 1px solid #e5e5e5;
-            background: #fff url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007AFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E") no-repeat right 6px center;
-            background-size: 10px; appearance: none; -webkit-appearance: none;
-            font-size: 12px; color: var(--primary); font-weight: 600; min-width: 100px; outline: none; cursor: pointer;
-        }
-
-        .btn-icon { background: var(--primary); color: white; border: none; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .btn-action { border: none; padding: 0 10px; height: 26px; border-radius: 13px; cursor: pointer; display: none; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: white; }
-        .btn-save { background: var(--success); }
-        .btn-del { background: var(--danger); margin-left: 4px; }
-
-        /* 主界面 */
         .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
-        .chart-wrapper { flex: 1; background: var(--card); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; position: relative; min-width: 0; }
-        .chart-tags-container { position: absolute; top: 10px; left: 55px; right: 20px; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; z-index: 5; }
-        .chart-tag-chip { background: rgba(255, 255, 255, 0.95); border: 1px solid #e5e5e5; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; pointer-events: auto; }
+        .chart-wrapper { flex: 1; background: var(--card); border-radius: var(--radius); position: relative; }
         #chart-container { width: 100%; height: 100%; }
 
-        .list-wrapper { width: 260px; background: var(--card); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
-        .list-header { padding: 10px 14px; font-size: 13px; font-weight: 700; background: var(--header-bg); border-bottom: 1px solid #dcdcdc; display: flex; justify-content: space-between; }
-        .list-body { flex: 1; overflow-y: auto; background: var(--card); }
-        .list-item { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f9f9f9; }
-        .list-item:hover { background: #f9f9f9; }
-        .list-item.active-state { background: #eef6ff; font-weight: 600; border-left: 3px solid var(--primary); }
-        .list-item.dimmed { opacity: 0.3; filter: grayscale(100%); } 
-
-        .idx-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; }
-        .up { color: var(--danger); } .down { color: var(--success); }
-        .loading-mask { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-        .loading-mask.show { opacity: 1; pointer-events: auto; }
-
-        /* 模态框 */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-        .modal-overlay.active { display: flex; }
-        .modal-card { background: #fff; width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; }
-        .form-input { width: 100%; padding: 8px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
-        .modal-btns { display: flex; gap: 10px; }
-        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; }
-
-        @media (max-width: 768px) {
-            .workspace { flex-direction: column; padding: 0; }
-            .chart-wrapper { flex: 0 0 50vh; border-radius: 0; }
-            .list-wrapper { width: 100%; flex: 1; border-radius: 0; }
+        .list-wrapper { width: 280px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+        .data-list { flex: 1; background: var(--card); border-radius: var(--radius); overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        
+        /* 诊断报告区域样式 */
+        .debug-panel { 
+            height: 180px; background: #2c3e50; color: #ecf0f1; border-radius: var(--radius); 
+            padding: 10px; font-family: monospace; font-size: 11px; overflow-y: auto; border: 2px solid var(--danger);
         }
+        .debug-title { color: #e74c3c; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #555; }
+
+        .list-item { padding: 8px 12px; display: flex; justify-content: space-between; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+        .up { color: var(--danger); } .down { color: var(--success); }
+        .loading-mask { position: absolute; inset: 0; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; display: none; }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="app-title"><i class="fas fa-layer-group" style="color:var(--primary)"></i> 行业强弱追踪</div>
-    <div class="sync-info">
-        <div id="syncDot" class="sync-dot"></div>
-        <span id="updateTime">连接中...</span>
-        <button class="header-btn" onclick="openSettings()"><i class="fas fa-cog"></i></button>
-    </div>
+    <div class="app-title">📈 行业追踪诊断版</div>
+    <div style="font-size:12px; color:var(--text-sec)" id="updateInfo">数据加载中...</div>
 </header>
 
 <div class="control-panel">
-    <div class="input-group">
-        <input type="date" id="startDate" class="date-inp" onchange="handleRankingInputChange()">
-        <span>-</span>
-        <input type="date" id="endDate" class="date-inp" onchange="handleRankingInputChange()">
-    </div>
-    <div class="input-group" id="rankInputs">
-        <input type="number" id="rankStart" class="num-inp" value="1">
-        <span>-</span>
-        <input type="number" id="rankEnd" class="num-inp" value="10" onchange="handleRankingInputChange()">
-    </div>
-    <select id="modeSelect" class="group-select" onchange="handleModeChange(this.value)">
-        <option value="__RANKING__">🏆 自动排名</option>
-        <option disabled>──────────</option>
-    </select>
-    <button class="btn-icon" onclick="fetchData()"><i class="fas fa-sync-alt" style="font-size:12px"></i></button>
-    <div style="margin-left:auto; display:flex;">
-        <button id="saveGroupBtn" class="btn-action btn-save" onclick="saveCurrentSelection()"><i class="fas fa-save"></i> 保存</button>
-        <button id="delGroupBtn" class="btn-action btn-del" onclick="deleteCurrentGroup()"><i class="fas fa-trash"></i> 删除</button>
-    </div>
+    <input type="date" id="startDate" class="date-inp" onchange="runAnalysis()">
+    <span>至</span>
+    <input type="date" id="endDate" class="date-inp" onchange="runAnalysis()">
+    <button onclick="fetchData()" style="padding:4px 10px">刷新数据</button>
 </div>
 
 <div class="workspace">
     <div class="chart-wrapper">
-        <div id="chart-tags" class="chart-tags-container"></div>
-        <div class="loading-mask" id="loader"><span><i class="fas fa-spinner fa-spin"></i> 加载中...</span></div>
+        <div id="loader" class="loading-mask">加载中...</div>
         <div id="chart-container"></div>
     </div>
     <div class="list-wrapper">
-        <div class="list-header"><span>名称</span><span>阶段收益</span></div>
-        <div class="list-body" id="rankList"></div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="settingModal">
-    <div class="modal-card">
-        <h3>GitHub 配置</h3>
-        <input type="text" id="cfgOwner" class="form-input" placeholder="用户名">
-        <input type="text" id="cfgRepo" class="form-input" placeholder="仓库名">
-        <input type="password" id="cfgToken" class="form-input" placeholder="Token">
-        <div class="modal-btns">
-            <button style="background:#f2f2f2" onclick="closeSettings()">取消</button>
-            <button style="background:var(--primary);color:#fff" onclick="saveSettings()">保存</button>
+        <div class="data-list" id="rankList"></div>
+        
+        <!-- 诊断报告框 -->
+        <div class="debug-panel" id="debugPanel">
+            <div class="debug-title">🔍 诊断报告 (反馈给助手)</div>
+            <div id="debugContent">等待数据加载...</div>
         </div>
     </div>
 </div>
 
 <script>
-    let GITHUB = { owner: '', repo: '', path: 'groups.json', token: '' };
-    let rawData = null, groupsData = {}, myChart = null;
-    let selectedSeries = new Set(), globalDates = [], activeMode = '__RANKING__', activeGroupName = null;
-    let industryColors = {}, currentRankedData = [], currentViewData = [];
-    const colorPalette = ['#FF3030','#007AFF','#00C040','#FFD700','#9C27B0','#00CED1','#FF9500','#FF1493','#8B4513','#708090','#000000'];
-
-    function loadConfig() {
-        GITHUB.owner = localStorage.getItem('gh_owner') || 'dlezywj-cell';
-        GITHUB.repo = localStorage.getItem('gh_repo') || 'stocktracker';
-        GITHUB.token = localStorage.getItem('gh_token') || '';
-        document.getElementById('cfgOwner').value = GITHUB.owner;
-        document.getElementById('cfgRepo').value = GITHUB.repo;
-        document.getElementById('cfgToken').value = GITHUB.token;
-    }
+    let rawData = null, myChart = null, globalDates = [];
 
     async function fetchData() {
-        const loader = document.getElementById('loader');
-        loader.classList.add('show');
+        document.getElementById('loader').style.display = 'flex';
         try {
             const res = await fetch('industry_data.json?t=' + Date.now());
             rawData = await res.json();
             globalDates = rawData.dates;
+            document.getElementById('updateInfo').innerText = "最后更新: " + rawData.last_update;
             
-            // 加载板块数据
-            if(GITHUB.token) {
-                const url = `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.path}`;
-                const gRes = await fetch(url, { headers: { 'Authorization': `Bearer ${GITHUB.token}` }, cache: 'no-store' });
-                if(gRes.ok) {
-                    const json = await gRes.json();
-                    groupsData = JSON.parse(decodeURIComponent(escape(window.atob(json.content))));
-                }
-            }
-            
-            document.getElementById('syncDot').className = 'sync-dot online';
-            document.getElementById('updateTime').innerText = rawData.last_update.split(' ')[0];
-            
-            updateDropdown();
-            calcAndRender(true);
+            runAnalysis();
+            printDebugInfo();
         } catch (e) {
-            console.error(e);
-            document.getElementById('syncDot').className = 'sync-dot error';
+            document.getElementById('debugContent').innerHTML = "<span style='color:red'>加载失败: " + e.message + "</span>";
         } finally {
-            loader.classList.remove('show');
+            document.getElementById('loader').style.display = 'none';
         }
     }
 
-    function calcAndRender(init) {
+    // 核心显示逻辑
+    function runAnalysis() {
         if(!rawData) return;
         const sDate = document.getElementById('startDate').value;
         const eDate = document.getElementById('endDate').value;
 
-        // --- 核心修正：锁定索引 ---
-        let sIdx = globalDates.findIndex(d => d >= sDate); 
+        // 1. 计算索引 (采用最严谨的边界计算)
+        let sIdx = globalDates.findIndex(d => d >= sDate);
         if(sIdx < 0) sIdx = 0;
 
         let eIdx = globalDates.findIndex(d => d > eDate);
-        if (eIdx === -1) {
-            eIdx = globalDates.length - 1; // 锁定到最后一天
-        } else {
-            eIdx = Math.max(0, eIdx - 1); // 锁定到所选日期的最后有效位
-        }
+        if(eIdx === -1) eIdx = globalDates.length - 1;
+        else eIdx = Math.max(0, eIdx - 1);
 
-        // --- 诊断报告 (仅在第一次加载时) ---
-        if(init) {
-            console.log("诊断：数据最后日期=" + globalDates[globalDates.length-1] + "，当前锁定索引=" + eIdx);
-        }
-
-        let list = [];
-        let names = (activeMode === '__RANKING__') ? Object.keys(rawData.data) : (groupsData[activeGroupName] || []);
-        
-        names.forEach(name => {
-            const arr = rawData.data[name];
-            if(!arr || arr.length <= sIdx) return;
-            let v1 = arr[sIdx];
-            if(!v1) { for(let k=sIdx; k<=eIdx; k++) if(arr[k]){v1=arr[k];break;} }
-            let v2 = arr[eIdx]; 
-            if(v1 && v2) list.push({ name: name, pct: (v2-v1)/v1, fullData: arr });
+        // 2. 准备图表数据
+        const industryNames = Object.keys(rawData.data).slice(0, 10); // 默认显示前10个
+        const series = industryNames.map(name => {
+            const vals = rawData.data[name];
+            const base = vals[sIdx] || 1;
+            return {
+                name: name,
+                type: 'line',
+                smooth: true,
+                showSymbol: false,
+                data: vals.map(v => v ? parseFloat((v/base).toFixed(4)) : null)
+            };
         });
 
-        list.sort((a,b) => b.pct - a.pct);
-        if(activeMode === '__RANKING__') {
-            currentRankedData = list.slice(parseInt(document.getElementById('rankStart').value)-1, document.getElementById('rankEnd').value);
-        } else {
-            currentRankedData = list;
-        }
-
-        industryColors = {};
-        currentRankedData.forEach((item, i) => industryColors[item.name] = colorPalette[i % colorPalette.length]);
-
-        renderChart(sIdx, eIdx);
-        updateChartData(sIdx, eIdx);
-    }
-
-    function renderChart(sIdx, eIdx) {
-        if(!myChart) {
-            myChart = echarts.init(document.getElementById('chart-container'));
-            myChart.on('dataZoom', p => {
-                const opt = myChart.getOption();
-                const start = opt.dataZoom[0].startValue;
-                const end = opt.dataZoom[0].endValue;
-                updateChartData(start, end);
-            });
-        }
-        
-        const series = currentRankedData.map(item => ({
-            name: item.name, type: 'line', smooth: true, showSymbol: false,
-            lineStyle: { width: 2, color: industryColors[item.name] },
-            data: []
-        }));
-
+        // 3. 渲染
+        if(!myChart) myChart = echarts.init(document.getElementById('chart-container'));
         myChart.setOption({
-            animation: false,
-            grid: { left:45, right:20, top:30, bottom:40 },
-            xAxis: { type: 'category', data: globalDates, boundaryGap:false },
-            yAxis: { type: 'value', scale:true, axisLabel:{formatter:v=>((v-1)*100).toFixed(0)+'%'} },
-            dataZoom: [{ type:'slider', startValue:sIdx, endValue:eIdx, height:20, bottom:5 }, { type:'inside' }],
-            tooltip: { trigger:'axis', formatter: p => {
-                let s = p[0].axisValue + '<br/>';
-                p.sort((a,b)=>b.value-a.value).forEach(x => {
-                    const dim = selectedSeries.size>0 && !selectedSeries.has(x.seriesName);
-                    s += `<span style="color:${dim?'#ccc':x.color}">● ${x.seriesName}: ${((x.value-1)*100).toFixed(2)}%</span><br/>`;
-                });
-                return s;
-            }},
+            grid: { left: 50, right: 20, top: 20, bottom: 40 },
+            xAxis: { type: 'category', data: globalDates, boundaryGap: false },
+            yAxis: { type: 'value', scale: true, axisLabel: { formatter: v => ((v-1)*100).toFixed(1) + '%' } },
+            dataZoom: [{ startValue: sIdx, endValue: eIdx }, { type: 'inside' }],
+            tooltip: { trigger: 'axis' },
             series: series
         }, true);
+
+        // 4. 列表渲染
+        const listHtml = industryNames.map(name => {
+            const vals = rawData.data[name];
+            const v1 = vals[sIdx], v2 = vals[eIdx];
+            const pct = (v1 && v2) ? ((v2-v1)/v1*100).toFixed(2) : '--';
+            return `<div class="list-item"><span>${name}</span><span class="${pct>0?'up':'down'}">${pct}%</span></div>`;
+        }).join('');
+        document.getElementById('rankList').innerHTML = listHtml;
     }
 
-    function updateChartData(sIdx, eIdx) {
-        sIdx = Math.floor(sIdx); eIdx = Math.floor(eIdx);
-        const actualEnd = Math.min(eIdx, globalDates.length - 1);
+    // --- 关键诊断打印函数 ---
+    function printDebugInfo() {
+        const content = document.getElementById('debugContent');
+        const dates = rawData.dates;
+        const lastIdx = dates.length - 1;
         
-        const newSeries = currentRankedData.map(item => {
-            let base = item.fullData[sIdx];
-            if(!base) { for(let k=sIdx; k<=actualEnd; k++) if(item.fullData[k]){base=item.fullData[k];break;} }
-            return { data: item.fullData.map(v => v ? parseFloat((v/base).toFixed(4)) : null) };
-        });
+        // 取第一个行业的数据做样本
+        const sampleName = Object.keys(rawData.data)[0];
+        const sampleData = rawData.data[sampleName];
 
-        myChart.setOption({ series: newSeries });
+        let html = "";
+        html += `1. 数据总长度: ${dates.length} 条\n`;
+        html += `2. 最后三天日期:\n`;
+        html += `   [${lastIdx-2}]: ${dates[lastIdx-2] || '无'}\n`;
+        html += `   [${lastIdx-1}]: ${dates[lastIdx-1] || '无'}\n`;
+        html += `   [${lastIdx}]: ${dates[lastIdx] || '无'}\n`;
         
-        // 更新列表
-        const listData = currentRankedData.map(item => {
-            const v1 = item.fullData[sIdx], v2 = item.fullData[actualEnd];
-            return { name: item.name, pct: (v1 && v2) ? (v2-v1)/v1 : -999 };
-        }).sort((a,b) => b.pct - a.pct);
+        html += `\n3. 样本(${sampleName.substring(0,4)})最后三日数值:\n`;
+        html += `   [${lastIdx-2}]: ${sampleData[lastIdx-2]}\n`;
+        html += `   [${lastIdx-1}]: ${sampleData[lastIdx-1]}\n`;
+        html += `   [${lastIdx}]: ${sampleData[lastIdx]}\n`;
 
-        currentViewData = listData;
-        renderList(listData);
-        updateVisuals(null);
-    }
-
-    function renderList(data) {
-        const div = document.getElementById('rankList');
-        div.innerHTML = data.map((d, i) => `
-            <div class="list-item" data-n="${d.name}" onclick="toggleLock('${d.name}')">
-                <div><span class="idx-dot" style="background:${industryColors[d.name]}"></span>${d.name}</div>
-                <div class="${d.pct>=0?'up':'down'}">${d.pct===-999?'--':(d.pct*100).toFixed(2)+'%'}</div>
-            </div>`).join('');
-    }
-
-    function toggleLock(name) {
-        if(selectedSeries.has(name)) selectedSeries.delete(name); else selectedSeries.add(name);
-        updateVisuals(null);
-        document.getElementById('saveGroupBtn').style.display = selectedSeries.size > 0 ? 'flex' : 'none';
-    }
-
-    function updateVisuals(hoverName) {
-        const hasSel = selectedSeries.size > 0;
-        const tags = document.getElementById('chart-tags');
-        tags.innerHTML = Array.from(selectedSeries).map(n => `<div class="chart-tag-chip" style="color:${industryColors[n]}">${n}</div>`).join('');
-
-        myChart.setOption({
-            series: currentRankedData.map(item => {
-                const isH = selectedSeries.has(item.name) || item.name === hoverName;
-                return { lineStyle: { opacity: !hasSel && !hoverName ? 1 : (isH ? 1 : 0.1), width: isH ? 3 : 2 } };
-            })
-        });
-
-        document.querySelectorAll('.list-item').forEach(el => {
-            const n = el.dataset.n;
-            el.className = `list-item ${selectedSeries.has(n)?'active-state':''} ${((hasSel||hoverName)&&!selectedSeries.has(n)&&n!==hoverName)?'dimmed':''}`;
-        });
-    }
-
-    function handleRankingInputChange() { calcAndRender(false); }
-    function handleModeChange(v) { activeMode = v; activeGroupName = (v==='__RANKING__'?null:v); calcAndRender(false); }
-    function openSettings() { document.getElementById('settingModal').classList.add('active'); }
-    function closeSettings() { document.getElementById('settingModal').classList.remove('active'); }
-    function saveSettings() {
-        localStorage.setItem('gh_owner', document.getElementById('cfgOwner').value);
-        localStorage.setItem('gh_repo', document.getElementById('cfgRepo').value);
-        localStorage.setItem('gh_token', document.getElementById('cfgToken').value);
-        loadConfig(); closeSettings(); fetchData();
-    }
-    function updateDropdown() {
-        const sel = document.getElementById('modeSelect');
-        sel.innerHTML = '<option value="__RANKING__">🏆 自动排名</option><option disabled>──────────</option>';
-        Object.keys(groupsData).forEach(k => sel.add(new Option(k, k)));
+        const eDate = document.getElementById('endDate').value;
+        const findTest = dates.findIndex(d => d > eDate);
+        html += `\n4. 逻辑测试:\n`;
+        html += `   选择结束日期: ${eDate}\n`;
+        html += `   findIndex(>结束日期): ${findTest}\n`;
+        
+        content.innerText = html;
+        
+        // 如果最后一天数值是空的，亮红警告
+        if (sampleData[lastIdx] === null || sampleData[lastIdx] === undefined) {
+            content.innerHTML += `\n<span style="color:#ff7675; font-weight:bold">⚠️ 警告：最后一天数值缺失(Null)！</span>`;
+        }
     }
 
     // 初始化
-    loadConfig();
-    const d = new Date(); document.getElementById('endDate').valueAsDate = d;
-    d.setDate(d.getDate()-30); document.getElementById('startDate').valueAsDate = d;
+    const d = new Date();
+    document.getElementById('endDate').valueAsDate = d;
+    d.setDate(d.getDate() - 30);
+    document.getElementById('startDate').valueAsDate = d;
     fetchData();
     window.onresize = () => myChart && myChart.resize();
-
 </script>
+
 </body>
 </html>
