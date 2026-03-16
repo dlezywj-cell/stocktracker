@@ -1,96 +1,93 @@
-import akshare as ak
-import pandas as pd
-import json
-import datetime
-import time
+try:
+    sw_boards = ak.sw_index_second_info()
+    print(f"SUCCESS: 获取到 {len(sw_boards)} 个申万二级行业")
+except Exception as e:
+    print(f"ERROR: 获取申万行业列表失败。")
+    raise e
 
-def fetch_data_logic(info_df, symbol_col, name_col, is_sw=True):
-    """通用抓取逻辑"""
-    start_date = (datetime.datetime.now() - datetime.timedelta(days=730)).strftime("%Y%m%d")
-    end_date = datetime.datetime.now().strftime("%Y%m%d")
-    data_store = {}
+# 设定时间范围 (最近2年)
+start_date = (datetime.datetime.now() - datetime.timedelta(days=730)).strftime("%Y%m%d")
+end_date = datetime.datetime.now().strftime("%Y%m%d")
+
+data_store = {}
+
+print("Step 2: 循环获取行业历史数据 (速度较慢，请耐心等待)...")
+
+max_retries = 3
+total = len(sw_boards)
+
+for i, row in sw_boards.iterrows():
+    code = str(row['行业代码']).split('.')[0]
+    name = row['行业名称']
     
-    for i, (_, row) in enumerate(info_df.iterrows()):
-        code = str(row[symbol_col]).split('.')[0]
-        name = row[name_col]
-        
-        print(f"  [{i+1}/{len(info_df)}] 抓取 {name}...", end="", flush=True)
-        time.sleep(1.5)  # 遵守 1.5 秒规则
-        
+    print(f"[{i+1}/{total}] 获取 {name} ({code})...", end="", flush=True)
+    
+    # === 唯一修改的地方 ===
+    # 原来是 time.sleep(0.5)，太快容易被封。
+    # 改成 1.5 秒，虽然总耗时会多几分钟，但每天只跑一次，稳最重要。
+    time.sleep(1.5) 
+    
+    fetched = False
+    for attempt in range(max_retries):
         try:
-            if is_sw:
-                df = ak.index_hist_sw(symbol=code, period="day")
-            else:
-                # 综合指数使用 A 股指数日频接口
-                df = ak.index_zh_a_hist(symbol=code, period="daily", start_date=start_date, end_date=end_date)
+            df = ak.index_hist_sw(symbol=code, period="day")
             
-            if df is not None and not df.empty:
-                # 统一日期列
-                date_col = '日期' if '日期' in df.columns else df.index.name
-                df[date_col] = pd.to_datetime(df[date_col])
-                df.set_index(date_col, inplace=True)
-                df.sort_index(inplace=True)
-                
-                # 截取近两年并只取收盘价
-                mask = (df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))
-                data_store[name] = df.loc[mask, '收盘']
-                print(" 成功")
+            if df is None or df.empty:
+                raise ValueError("Empty Data")
+
+            if '日期' in df.columns:
+                df['日期'] = pd.to_datetime(df['日期'])
+                df.set_index('日期', inplace=True)
             else:
-                print(" 无数据")
-        except Exception:
-            print(" 失败")
+                df.index = pd.to_datetime(df.index)
             
-    if not data_store: return None
+            df.sort_index(inplace=True)
+            
+            mask = (df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))
+            df_subset = df.loc[mask]
+            
+            if df_subset.empty:
+                print(f" 无区间数据 - 跳过")
+            else:
+                data_store[name] = df_subset['收盘']
+                print(f" 成功 ({len(df_subset)}条)")
+            
+            fetched = True
+            break 
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                # 失败重试时多睡一会
+                time.sleep(3)
+            else:
+                print(f" 失败") 
 
-    # 对齐所有日期，防止停牌导致的数据错位
-    df_all = pd.DataFrame(data_store)
-    df_all.sort_index(inplace=True)
-    df_all.fillna(method='ffill', inplace=True) # 向前填充
-    df_all.fillna(0, inplace=True)
-    
-    return {
-        "dates": df_all.index.strftime('%Y-%m-%d').tolist(),
-        "data": {col: df_all[col].round(2).tolist() for col in df_all.columns}
-    }
+print(f"\nStep 3: 数据清洗与对齐...")
 
-def main():
-    print("开始更新数据...")
-    final_json = {
-        "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "market": {}, "sw_l1": {}, "sw_l2": {}
-    }
+if not data_store:
+    raise ValueError("严重错误：没有获取到任何申万数据！")
 
-    # 1. 综合指数
-    print("\n步骤 1: 抓取综合指数")
-    market_list = pd.DataFrame([
-        {"code": "000001", "name": "上证指数"},
-        {"code": "000300", "name": "沪深300"},
-        {"code": "399006", "name": "创业板指"},
-        {"code": "000905", "name": "中证500"},
-        {"code": "000852", "name": "中证1000"},
-        {"code": "932000", "name": "中证2000"},
-        {"code": "000906", "name": "中证800"},
-    ])
-    final_json["market"] = fetch_data_logic(market_list, 'code', 'name', False)
+df_all = pd.DataFrame(data_store)
+df_all.sort_index(inplace=True)
+df_all.fillna(method='ffill', inplace=True)
+df_all.fillna(0, inplace=True)
 
-    # 2. 申万一级
-    print("\n步骤 2: 抓取申万一级行业")
-    try:
-        sw_l1_info = ak.sw_index_first_info()
-        final_json["sw_l1"] = fetch_data_logic(sw_l1_info, '行业代码', '行业名称', True)
-    except: print("申万一级列表获取失败")
+common_dates = df_all.index.strftime('%Y-%m-%d').tolist()
 
-    # 3. 申万二级
-    print("\n步骤 3: 抓取申万二级行业")
-    try:
-        sw_l2_info = ak.sw_index_second_info()
-        final_json["sw_l2"] = fetch_data_logic(sw_l2_info, '行业代码', '行业名称', True)
-    except: print("申万二级列表获取失败")
+final_data_map = {}
+for col in df_all.columns:
+    final_data_map[col] = df_all[col].round(4).tolist()
 
-    # 保存文件
-    with open("industry_data.json", "w", encoding="utf-8") as f:
-        json.dump(final_json, f, ensure_ascii=False)
-    print("\n数据保存成功：industry_data.json")
+final_json = {
+    "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "source": "Shenwan Level 2 (AkShare)",
+    "dates": common_dates,
+    "data": final_data_map
+}
 
-if __name__ == "__main__":
-    main()
+with open("industry_data.json", "w", encoding="utf-8") as f:
+    json.dump(final_json, f, ensure_ascii=False, separators=(',', ':'))
+
+print(f"SUCCESS: industry_data.json 保存成功。包含 {len(common_dates)} 个交易日，{len(final_data_map)} 个行业。")
+if name == "main":
+fetch_and_save_data()
