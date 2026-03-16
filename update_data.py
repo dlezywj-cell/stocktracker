@@ -1,3 +1,12 @@
+import akshare as ak
+import pandas as pd
+import json
+import datetime
+import time
+import random  # 引入 random 库
+import os
+def fetch_and_save_data():
+print("Step 1: 获取申万(Shenwan)二级行业列表...")
 try:
     sw_boards = ak.sw_index_second_info()
     print(f"SUCCESS: 获取到 {len(sw_boards)} 个申万二级行业")
