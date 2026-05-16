@@ -2,11 +2,13 @@ name: Update Stock Data
 
 on:
   schedule:
-    # 北京时间 20:30 对应 UTC 时间 12:30
-    # 这个时间点，所有财经数据接口肯定都更新完当天的日线了
-    - cron: '30 12 * * 1-5'
-    
+    # 稍微推迟一点，北京时间 21:30 (UTC 13:30)，确保申万数据完全入库
+    - cron: '30 13 * * 1-5'
   workflow_dispatch:
+
+# 解决 Node.js 20 警告的环境变量
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -18,12 +20,12 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 下载完整历史，避免 git pull 报错
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.10' # 稍微提高下 Python 版本
 
     - name: Install dependencies
       run: |
@@ -37,25 +39,17 @@ jobs:
 
     - name: Commit and Push changes
       run: |
-        git config --global user.name 'GitHub Action'
-        git config --global user.email 'action@github.com'
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
-        # 1. 把所有文件加入暂存区
         git add .
         
-        # 2. 判断暂存区是否有变化
-        if ! git diff --staged --quiet; then
-          echo "检测到数据变化，准备提交..."
-          
-          git commit -m "Auto update: $(date +'%Y-%m-%d')"
-          
-          # 3. 拉取并合并 (修复 rejected 报错)
-          git pull --rebase origin main
-          
-          # 4. 推送
-          git push origin main
-          
-          echo "推送成功！"
+        # 优化提交逻辑：只在有 .json 变更时提交
+        if git diff --staged --quiet; then
+          echo "No changes detected in industry_data.json"
         else
-          echo "没有检测到数据变化 (No changes to commit)."
+          git commit -m "Auto update industry data: $(date +'%Y-%m-%d %H:%M')"
+          git pull --rebase origin main
+          git push origin main
+          echo "Push successful!"
         fi
