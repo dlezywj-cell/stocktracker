@@ -2,6 +2,8 @@ name: Update Stock Data
 
 on:
   schedule:
+    # GitHub Actions 使用 UTC：北京时间 09:00 对应 UTC 01:00
+    - cron: '0 1 * * 1-5'
     # 稍微推迟一点，北京时间 21:30 (UTC 13:30)，确保申万数据完全入库
     - cron: '30 13 * * 1-5'
   workflow_dispatch:
