@@ -253,7 +253,8 @@
             }
 
             dot.className = 'sync-dot online';
-            timeTxt.innerText = (rawData.last_update || 'Ready').split(' ')[0];
+            const asOf = rawData.data_as_of || (rawData.dates && rawData.dates[rawData.dates.length - 1]);
+            timeTxt.innerText = asOf ? `数据 ${asOf}` : (rawData.last_update || 'Ready').split(' ')[0];
             
             updateDropdown();
             calcAndRender(true);

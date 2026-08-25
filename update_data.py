@@ -1,120 +1,141 @@
-import akshare as ak
-import pandas as pd
+"""Fast Shenwan level-2 industry close updater.
+
+The daily-analysis endpoint can be published late. The SWS real-time endpoint
+already exposes the previous trading day's close as ``昨收盘`` shortly after
+the market closes, so it is used as the fast path.
+"""
+
+import datetime as dt
 import json
-import datetime
 import os
 import time
 
-def fetch_and_save_data_incremental():
-    file_path = "industry_data.json"
-    now_dt = datetime.datetime.now()
-    
-    # --- 1. 读取本地现有数据 ---
-    existing_data = None
-    last_date_str = None
-    
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                existing_data = json.load(f)
-            if existing_data and "dates" in existing_data and len(existing_data["dates"]) > 0:
-                last_date_str = existing_data["dates"][-1]
-                print(f"检测到本地数据，最后日期为: {last_date_str}")
-        except Exception as e:
-            print(f"读取旧文件失败或文件损坏，将重新全量获取: {e}")
+import akshare as ak
+import pandas as pd
 
-    # --- 2. 确定请求的时间范围 ---
-    if last_date_str:
-        # 如果有本地数据，从最后一天开始（多取几天以防万一，后面对齐会去重）
-        start_dt = datetime.datetime.strptime(last_date_str, "%Y-%m-%d") - datetime.timedelta(days=3)
-    else:
-        # 如果没有本地数据，初始化获取近 1 年（365天）
-        print("本地无数据，执行初始化（获取近1年数据）...")
-        start_dt = now_dt - datetime.timedelta(days=365)
+DATA_FILE = "industry_data.json"
+MAX_DAYS = 500
 
-    start_date_param = start_dt.strftime("%Y%m%d")
-    end_date_param = now_dt.strftime("%Y%m%d")
 
-    if start_date_param == end_date_param and last_date_str:
-        print("数据已是最新，无需更新。")
-        return
+def _read_existing():
+    if not os.path.exists(DATA_FILE):
+        return None
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        print(f"读取旧文件失败，将重新获取: {exc}")
+        return None
 
-    # --- 3. 调用 API 获取新数据 ---
-    print(f"正在拉取 {start_date_param} 到 {end_date_param} 的增量数据...")
-    new_df = pd.DataFrame()
+
+def _previous_trade_date(today):
+    calendar = ak.tool_trade_date_hist_sina()
+    dates = pd.to_datetime(calendar["trade_date"], errors="coerce").dt.date
+    previous = [d for d in dates if pd.notna(d) and d < today]
+    if not previous:
+        raise RuntimeError("无法确定上一个交易日")
+    return max(previous)
+
+
+def _fast_previous_close(target_date):
     for attempt in range(3):
         try:
-            new_df = ak.index_analysis_daily_sw(
-                symbol="二级行业",
-                start_date=start_date_param,
-                end_date=end_date_param
-            )
-            if not new_df.empty:
-                break
-        except Exception as e:
-            print(f"重试 {attempt+1}/3: {e}")
-            time.sleep(2)
+            df = ak.index_realtime_sw(symbol="二级行业")
+            if df.empty:
+                raise RuntimeError("实时接口返回空数据")
+            out = df[["指数名称", "昨收盘"]].copy()
+            out["收盘指数"] = pd.to_numeric(out["昨收盘"], errors="coerce")
+            out["发布日期"] = pd.Timestamp(target_date)
+            out = out[["发布日期", "指数名称", "收盘指数"]].dropna(subset=["收盘指数"])
+            if len(out) < 100:
+                raise RuntimeError(f"实时接口只返回 {len(out)} 个行业，疑似未完成发布")
+            print(f"快速路径成功：{len(out)} 个二级行业，目标日期 {target_date}")
+            return out
+        except Exception as exc:
+            print(f"实时接口重试 {attempt + 1}/3: {exc}")
+            time.sleep(3 * (attempt + 1))
+    return pd.DataFrame()
 
-    if new_df.empty:
-        print("未获取到新数据，可能今日尚未开盘或接口维护。")
-        return
 
-    # --- 4. 格式化新数据 ---
-    new_df['发布日期'] = pd.to_datetime(new_df['发布日期'])
-    new_df['收盘指数'] = pd.to_numeric(new_df['收盘指数'], errors='coerce')
-    # 只保留必要的列
-    new_df = new_df[['发布日期', '指数名称', '收盘指数']]
+def _daily_analysis_fallback(start_date, end_date):
+    try:
+        df = ak.index_analysis_daily_sw(
+            symbol="二级行业",
+            start_date=start_date.strftime("%Y%m%d"),
+            end_date=end_date.strftime("%Y%m%d"),
+        )
+        if df.empty or "发布日期" not in df.columns:
+            return pd.DataFrame()
+        df["发布日期"] = pd.to_datetime(df["发布日期"], errors="coerce")
+        df["收盘指数"] = pd.to_numeric(df["收盘指数"], errors="coerce")
+        return df[["发布日期", "指数名称", "收盘指数"]].dropna(subset=["发布日期", "收盘指数"])
+    except Exception as exc:
+        print(f"日报表兜底失败: {exc}")
+        return pd.DataFrame()
 
-    # --- 5. 合并新旧数据 ---
-    if existing_data:
-        # 将 JSON 转回 DataFrame 格式
-        old_rows = []
-        old_dates = existing_data["dates"]
-        for name, values in existing_data["data"].items():
-            for d, v in zip(old_dates, values):
-                old_rows.append({'发布日期': d, '指数名称': name, '收盘指数': v})
-        
-        old_df = pd.DataFrame(old_rows)
-        old_df['发布日期'] = pd.to_datetime(old_df['发布日期'])
-        
-        # 合并
-        combined_df = pd.concat([old_df, new_df], ignore_index=True)
+
+def _to_long_frame(data):
+    rows = []
+    for name, values in data.get("data", {}).items():
+        for date, value in zip(data.get("dates", []), values):
+            rows.append({"发布日期": date, "指数名称": name, "收盘指数": value})
+    return pd.DataFrame(rows)
+
+
+def fetch_and_save_data_incremental():
+    existing = _read_existing()
+    today = dt.datetime.now().date()
+    target_date = _previous_trade_date(today)
+
+    if existing:
+        print(f"检测到本地数据，最后日期为: {existing.get('dates', ['未知'])[-1]}")
     else:
-        combined_df = new_df
+        print("本地无数据，执行初始化（日报表近一年）...")
 
-    # --- 6. 数据清洗与对齐 ---
-    # 去重：按日期和行业名称去重，保留最后一次出现的记录
-    combined_df.drop_duplicates(subset=['发布日期', '指数名称'], keep='last', inplace=True)
-    
-    # 转换为宽表 (行是日期，列是行业)
-    pivot = combined_df.pivot(index='发布日期', columns='指数名称', values='收盘指数')
-    pivot.sort_index(inplace=True)
-    
-    # 填充缺失值（处理新上市或停牌行业）
+    # Fast path: yesterday's close is available before the daily report.
+    new_df = _fast_previous_close(target_date)
+
+    # Keep the old endpoint as a fallback for historical recovery/manual runs.
+    if new_df.empty:
+        last_date = (
+            pd.to_datetime(existing["dates"][-1]).date()
+            if existing and existing.get("dates")
+            else today - dt.timedelta(days=365)
+        )
+        new_df = _daily_analysis_fallback(last_date - dt.timedelta(days=3), today)
+
+    if new_df.empty and existing:
+        print("没有拿到新数据，保留现有文件")
+        return
+    if new_df.empty:
+        raise RuntimeError("实时接口和日报表接口均未返回数据")
+
+    old_df = _to_long_frame(existing) if existing else pd.DataFrame(
+        columns=["发布日期", "指数名称", "收盘指数"]
+    )
+    combined = pd.concat([old_df, new_df], ignore_index=True)
+    combined["发布日期"] = pd.to_datetime(combined["发布日期"], errors="coerce")
+    combined["收盘指数"] = pd.to_numeric(combined["收盘指数"], errors="coerce")
+    combined.dropna(subset=["发布日期", "指数名称", "收盘指数"], inplace=True)
+    combined.drop_duplicates(subset=["发布日期", "指数名称"], keep="last", inplace=True)
+
+    pivot = combined.pivot(index="发布日期", columns="指数名称", values="收盘指数").sort_index()
     pivot.ffill(inplace=True)
     pivot.fillna(0, inplace=True)
+    pivot = pivot.tail(MAX_DAYS)
 
-    # 限制数据长度：只保留最近 2 年的数据，防止 JSON 文件无限变大
-    # 2年大约 500 个交易日
-    if len(pivot) > 500:
-        pivot = pivot.tail(500)
-
-    # --- 7. 保存为 JSON ---
-    common_dates = pivot.index.strftime('%Y-%m-%d').tolist()
-    final_data_map = {col: pivot[col].round(2).tolist() for col in pivot.columns}
-
+    dates = pivot.index.strftime("%Y-%m-%d").tolist()
     final_json = {
-        "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "source": "Shenwan Level 2 (Incremental)",
-        "dates": common_dates,
-        "data": final_data_map
+        "last_update": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "data_as_of": dates[-1],
+        "source": "SWS level-2 previous close (fast path) + daily analysis fallback",
+        "dates": dates,
+        "data": {name: pivot[name].round(2).tolist() for name in pivot.columns},
     }
-
-    with open(file_path, "w", encoding="utf-8") as f:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(final_json, f, ensure_ascii=False)
+    print(f"SUCCESS: 数据已更新至 {dates[-1]}，共 {len(dates)} 个交易日、{len(final_json['data'])} 个行业")
 
-    print(f"SUCCESS: 数据已更新至 {common_dates[-1]}")
-    print(f"本次更新后共包含 {len(common_dates)} 个交易日的数据。")
 
 if __name__ == "__main__":
     fetch_and_save_data_incremental()
