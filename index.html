@@ -232,7 +232,25 @@
             const res = await fetch('industry_data.json?t=' + Date.now());
             if(!res.ok) throw new Error("Load data failed");
             rawData = await res.json();
-            globalDates = rawData.dates;
+
+            // 数据文件可能会提前生成当天的日期，但当天收盘数据尚未就绪。
+            // data_as_of 是数据实际更新到的交易日，因此不把其后的日期交给图表，
+            // 避免用前一交易日的收盘值画出当天的水平线。
+            const sourceDates = Array.isArray(rawData.dates) ? rawData.dates : [];
+            let visibleDateCount = sourceDates.length;
+            if(rawData.data_as_of) {
+                const lastVisibleIndex = sourceDates.reduce((last, date, index) =>
+                    date <= rawData.data_as_of ? index : last, -1);
+                if(lastVisibleIndex >= 0) visibleDateCount = lastVisibleIndex + 1;
+            }
+            globalDates = sourceDates.slice(0, visibleDateCount);
+            if(visibleDateCount < sourceDates.length && rawData.data) {
+                Object.keys(rawData.data).forEach(name => {
+                    if(Array.isArray(rawData.data[name])) {
+                        rawData.data[name] = rawData.data[name].slice(0, visibleDateCount);
+                    }
+                });
+            }
 
             // 2. 板块数据
             groupsData = {};
