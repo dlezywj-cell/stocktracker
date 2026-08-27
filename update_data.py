@@ -28,9 +28,16 @@ def _read_existing():
         return None
 
 
-def _previous_trade_date(today):
+def _trade_dates():
     calendar = ak.tool_trade_date_hist_sina()
-    dates = pd.to_datetime(calendar["trade_date"], errors="coerce").dt.date
+    return [
+        d for d in pd.to_datetime(calendar["trade_date"], errors="coerce").dt.date
+        if pd.notna(d)
+    ]
+
+
+def _previous_trade_date(today, dates=None):
+    dates = dates or _trade_dates()
     previous = [d for d in dates if pd.notna(d) and d < today]
     if not previous:
         raise RuntimeError("无法确定上一个交易日")
@@ -85,15 +92,26 @@ def _to_long_frame(data):
 def fetch_and_save_data_incremental():
     existing = _read_existing()
     today = dt.datetime.now().date()
-    target_date = _previous_trade_date(today)
+    trade_dates = _trade_dates()
+    is_trade_day = today in trade_dates
+    target_date = _previous_trade_date(today, trade_dates)
 
     if existing:
         print(f"检测到本地数据，最后日期为: {existing.get('dates', ['未知'])[-1]}")
     else:
         print("本地无数据，执行初始化（日报表近一年）...")
 
-    # Fast path: yesterday's close is available before the daily report.
-    new_df = _fast_previous_close(target_date)
+    # 收盘后优先读取当天日线。此前无论几点运行都只读取“昨收盘”，
+    # 导致收盘后的多次任务仍然重复写入前一交易日，无法更新到当天。
+    market_closed = is_trade_day and dt.datetime.now().time() >= dt.time(15, 5)
+    new_df = _daily_analysis_fallback(today, today) if market_closed else pd.DataFrame()
+    if not new_df.empty and new_df["指数名称"].nunique() < 100:
+        print(f"当天日线只返回 {new_df['指数名称'].nunique()} 个行业，暂不写入")
+        new_df = pd.DataFrame()
+
+    # 开盘前或当天日线尚未发布时，使用前一交易日的昨收盘快速路径。
+    if new_df.empty:
+        new_df = _fast_previous_close(target_date)
 
     # Keep the old endpoint as a fallback for historical recovery/manual runs.
     if new_df.empty:
